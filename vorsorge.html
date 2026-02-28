@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vorsorge — Gesundheitsfahrplan</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08080a; --surface: #111114; --surface2: #18181c;
+  --border: #222228; --border2: #3c3c48;
+  --accent: #7aaa8a; --accent-dim: #2a4a38;
+  --accent2: #aa8a4a; --accent2-dim: #4a3a1a;
+  --red: #c06060; --red-dim: #5a2828;
+  --text: #ddd8d0; --text-muted: #8a8680; --text-dim: #56545a;
+  --gold: #b8985a; --blue: #6a8aaa; --blue-dim: #2a3a4a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Space Mono', monospace; font-size: 12px; line-height: 1.6; min-height: 100vh; }
+body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.05'/%3E%3C/svg%3E"); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: rgba(8,8,10,0.96); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; height: 52px; backdrop-filter: blur(8px); }
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-style: italic; font-weight: 300; color: var(--text); margin-right: 32px; cursor: pointer; flex-shrink: 0; }
+.nav-links { display: flex; overflow-x: auto; scrollbar-width: none; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-link { padding: 0 16px; height: 52px; display: flex; align-items: center; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; white-space: nowrap; flex-shrink: 0; }
+.nav-link:hover { color: var(--text-muted); }
+.nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+.page { display: none; position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 72px 28px 100px; }
+.page.active { display: block; }
+.eyebrow { font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+.eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--accent-dim); }
+h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(38px, 6vw, 66px); font-weight: 300; line-height: 0.95; letter-spacing: -0.01em; color: var(--text); margin-bottom: 24px; }
+h1 em { font-style: italic; color: var(--gold); display: block; }
+.lead { color: var(--text-muted); max-width: 500px; line-height: 1.85; font-size: 11px; border-left: 1px solid var(--border2); padding-left: 20px; margin-bottom: 40px; }
+.lead p + p { margin-top: 10px; }
+.year-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+.year-label { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--text); }
+.year-stats { display: flex; border: 1px solid var(--border); margin-left: auto; }
+.ys { padding: 8px 18px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.ys:last-child { border-right: none; }
+.ys-num { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 300; line-height: 1; }
+.ys-num.done { color: var(--accent); } .ys-num.due { color: var(--red); } .ys-num.total { color: var(--gold); }
+.ys-label { font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); }
+.bereich { margin-bottom: 48px; }
+.bereich-header { display: flex; align-items: center; margin-bottom: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.bereich-icon { font-size: 16px; margin-right: 12px; }
+.bereich-name { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-style: italic; font-weight: 400; color: var(--text); }
+.bereich-progress { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.bp-track { width: 60px; height: 1px; background: var(--border); }
+.bp-fill { height: 100%; background: var(--accent); transition: width 0.4s; }
+.bp-count { font-size: 10px; color: var(--text-dim); }
+.untersuchung-list { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
+.u-card { background: var(--surface); border-left: 3px solid transparent; transition: background 0.15s; }
+.u-card.erledigt { border-left-color: var(--accent); }
+.u-card.faellig { border-left-color: var(--red); }
+.u-card.optional { border-left-color: var(--accent2-dim); }
+.u-card.info-card { border-left-color: var(--blue-dim); }
+.u-top { display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; cursor: pointer; }
+.u-check { width: 18px; height: 18px; border: 1px solid var(--border2); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; border-radius: 2px; }
+.u-check:hover { border-color: var(--accent); }
+.u-card.erledigt .u-check { background: var(--accent-dim); border-color: var(--accent); }
+.u-check-icon { color: var(--accent); font-size: 10px; display: none; }
+.u-card.erledigt .u-check-icon { display: block; }
+.u-check.no-check { border-color: transparent !important; background: transparent !important; cursor: default; }
+.u-info { flex: 1; }
+.u-meta { display: flex; gap: 6px; align-items: center; margin-bottom: 3px; flex-wrap: wrap; }
+.u-tag { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--border2); color: var(--text-muted); }
+.u-tag.pflicht { color: var(--accent); border-color: var(--accent-dim); }
+.u-tag.empfohlen { color: var(--accent2); border-color: var(--accent2-dim); }
+.u-tag.info-tag { color: var(--blue); border-color: var(--blue-dim); }
+.u-tag.faellig-tag { color: var(--red); border-color: var(--red-dim); }
+.u-tag.erledigt-tag { color: var(--accent); border-color: var(--accent-dim); }
+.u-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400; color: var(--text); margin-bottom: 2px; }
+.u-card.erledigt .u-name { color: var(--text-muted); }
+.u-interval { font-size: 10px; color: var(--text-dim); }
+.u-expand { color: var(--text-dim); font-size: 13px; transition: transform 0.25s; flex-shrink: 0; padding-top: 2px; }
+.u-card.open .u-expand { transform: rotate(180deg); }
+.u-detail { display: none; padding: 0 18px 18px; border-top: 1px solid var(--border); }
+.u-card.open .u-detail { display: block; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 580px) { .detail-grid { grid-template-columns: 1fr; } }
+.detail-block h4 { font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.detail-block p { color: var(--text-muted); font-size: 11px; line-height: 1.8; }
+.detail-block.full { grid-column: 1 / -1; }
+.datum-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+.datum-label { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); flex-shrink: 0; }
+.datum-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: 11px; padding: 6px 10px; }
+.datum-input:focus { outline: none; border-color: var(--accent-dim); }
+.datum-save { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--text); font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; transition: background 0.15s; }
+.datum-save:hover { background: var(--accent); color: var(--bg); }
+.datum-saved-msg { font-size: 10px; color: var(--accent); display: none; }
+.plus-box { grid-column: 1 / -1; border: 1px solid var(--accent2-dim); background: rgba(170,138,74,0.04); padding: 12px 16px; position: relative; margin-top: 4px; }
+.plus-box::before { content: 'DARÜBER HINAUS'; position: absolute; top: 0; left: 14px; transform: translateY(-50%); background: var(--surface2); padding: 0 6px; font-size: 8px; letter-spacing: 0.2em; color: var(--accent2); }
+.plus-box p { color: var(--text-muted); font-size: 11px; line-height: 1.8; }
+.tip-box { grid-column: 1 / -1; border: 1px solid var(--blue-dim); background: rgba(106,138,170,0.04); padding: 14px 16px 12px; position: relative; margin-top: 4px; }
+.tip-box::before { content: 'ALLTAGSTIPPS'; position: absolute; top: 0; left: 14px; transform: translateY(-50%); background: var(--surface2); padding: 0 6px; font-size: 8px; letter-spacing: 0.2em; color: var(--blue); }
+.tip-box ul { list-style: none; padding: 0; }
+.tip-box ul li { color: var(--text-muted); font-size: 11px; line-height: 1.85; padding-left: 14px; position: relative; }
+.tip-box ul li::before { content: '—'; position: absolute; left: 0; color: var(--blue); }
+.notiz-area { grid-column: 1 / -1; width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: 11px; padding: 10px 12px; resize: vertical; min-height: 60px; line-height: 1.7; margin-top: 4px; }
+.notiz-area:focus { outline: none; border-color: var(--border2); }
+.notiz-area::placeholder { color: var(--text-dim); }
+.kalender-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 40px; }
+@media (max-width: 580px) { .kalender-grid { grid-template-columns: repeat(2, 1fr); } }
+.monat-card { background: var(--surface); padding: 16px; }
+.monat-name { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; }
+.monat-item { font-size: 10px; color: var(--text-muted); line-height: 1.5; padding-left: 10px; border-left: 2px solid var(--border2); margin-bottom: 4px; }
+.monat-item.past { color: var(--text-dim); border-left-color: var(--accent-dim); text-decoration: line-through; text-decoration-color: var(--text-dim); }
+.monat-item.cur { border-left-color: var(--accent); color: var(--text); }
+.monat-empty { font-size: 10px; color: var(--text-dim); font-style: italic; }
+footer { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 40px; color: var(--text-dim); font-size: 10px; line-height: 2; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-logo" onclick="showPage('uebersicht')">Vorsorge</div>
+  <div class="nav-links">
+    <div class="nav-link active" data-page="uebersicht" onclick="showPage('uebersicht')">Übersicht</div>
+    <div class="nav-link" data-page="kalender" onclick="showPage('kalender')">Jahresplan</div>
+  </div>
+</nav>
+
+<div class="page active" id="page-uebersicht">
+  <div style="padding-top:24px;margin-bottom:40px">
+    <div class="eyebrow">Gesundheitsfahrplan — 33 Jahre</div>
+    <h1>Vorsorge.<br><em>Nicht warten,</em>bis etwas ist.</h1>
+    <div class="lead">
+      <p>Ein 33-jähriger gesunder Mann bekommt von der Schulmedizin wenig angeboten — das meiste wird erst ab 35 oder 45 Pflicht. Das bedeutet nicht, dass es nichts zu tun gibt. Es bedeutet, dass man selbst aktiv werden muss.</p>
+      <p>Diese Übersicht trennt zwischen dem, was die Krankenkasse zahlt, was sinnvoll darüber hinausgeht — und wie du deinen Alltag so gestaltest, dass Vorsorge gar nicht erst nötig wird.</p>
+    </div>
+  </div>
+  <div class="year-header">
+    <div class="year-label" id="year-label">2026</div>
+    <div class="year-stats">
+      <div class="ys"><span class="ys-num done" id="stat-done">0</span><span class="ys-label">Erledigt</span></div>
+      <div class="ys"><span class="ys-num due" id="stat-due">0</span><span class="ys-label">Fällig</span></div>
+      <div class="ys"><span class="ys-num total" id="stat-total">0</span><span class="ys-label">Gesamt</span></div>
+    </div>
+  </div>
+  <div id="bereiche-container"></div>
+  <footer>Angaben nach GKV, TK, DGIM und G-BA für gesunde Männer um 33 Jahre.<br>Kein Ersatz für ärztliche Beratung. Daten werden lokal gespeichert.</footer>
+</div>
+
+<div class="page" id="page-kalender">
+  <div style="padding-top:24px;margin-bottom:40px">
+    <div class="eyebrow">Jahresplan</div>
+    <h1>Wann<br><em>was.</em></h1>
+    <div class="lead"><p>Eine Empfehlung, wie du die Termine über das Jahr verteilen kannst — nicht alles auf einmal, aber auch nichts vergessen.</p></div>
+  </div>
+  <div class="kalender-grid" id="kalender-grid"></div>
+  <footer>Termine sind Vorschläge — passe sie an deinen Alltag an.</footer>
+</div>
+
+<div style="position:fixed;bottom:0;left:0;right:0;z-index:300;background:rgba(8,8,10,0.97);border-top:1px solid #222228;padding:10px 24px;display:flex;align-items:center;gap:12px;font-family:'Space Mono',monospace;">
+  <span style="font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:#56545a;flex:1">Datensicherung</span>
+  <span id="sync-msg" style="font-size:10px;color:#7aaa8a;letter-spacing:0.1em;"></span>
+  <button onclick="exportData()" style="background:#18181c;border:1px solid #3c3c48;color:#8a8680;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;padding:6px 14px;cursor:pointer;">↓ Export</button>
+  <button onclick="importData()" style="background:#18181c;border:1px solid #3c3c48;color:#8a8680;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;padding:6px 14px;cursor:pointer;">↑ Import</button>
+</div>
+
+<script>
+const B = [
+  { id:'check', icon:'🩺', name:'Allgemeiner Check-up', items:[
+    { id:'checkup-einmalig', name:'Gesundheits-Check-up 18–34', interval:'Einmalig — vor dem 35. Geburtstag', typ:'pflicht', checkable:true, monat:2,
+      was:'Einmalig kostenlos bei der GKV: Blutdruck, Blutzucker, Cholesterin, Körpergewicht, Anamnese. Beim Hausarzt explizit nach dem "Check-up 18–34" fragen.',
+      kontext:'Ab 35 gibt es denselben Check-up alle drei Jahre als GKV-Pflicht. Wer ihn vorher noch nicht genutzt hat, verschenkt eine kostenlose Baseline-Messung.',
+      plus:'Im Gespräch ansprechen: erweitertes Blutbild (Leber, Niere, TSH), Impfstatus prüfen lassen, Familienanamnese dokumentieren.',
+      tips:null },
+    { id:'blutdruck', name:'Blutdruckmessung', interval:'Jährlich, besser halbjährlich', typ:'pflicht', checkable:true, monat:1,
+      was:'Systolisch unter 120 mmHg, diastolisch unter 80 mmHg ist optimal. Kostenlos beim Hausarzt oder in der Apotheke.',
+      kontext:'Bluthochdruck ist die häufigste Ursache von Herzinfarkt und Schlaganfall — und jahrelang symptomlos. Stress, Schlafmangel und Übergewicht treiben ihn hoch.',
+      plus:'Eigenes Blutdruckmessgerät (~25€), morgens nüchtern selbst messen. Mehrere Messungen mitteln — einmalige Praxismessung oft ungenau durch "Weißkitteleffekt".',
+      tips:null }
+  ]},
+  { id:'blut', icon:'🩸', name:'Blutbild & Biomarker', items:[
+    { id:'blut-basis', name:'Großes Blutbild & Basislabor', interval:'Jährlich', typ:'empfohlen', checkable:true, monat:2,
+      was:'Blutbild, Leber- und Nierenwerte, Nüchtern-Blutzucker, Blutfette (LDL/HDL/Triglyzeride), TSH. Beim Hausarzt auf eigene Initiative anfordern.',
+      kontext:'Viele Krankheiten sind Jahre vor Symptomen im Labor sichtbar. Frühzeitige Diagnose macht Behandlung deutlich einfacher.',
+      plus:'Longevity-Baseline als IGeL (~50–100€): HbA1c (Langzeitblutzucker), hsCRP (stille Entzündung), Homocystein (kardiovaskuläres Risiko), Harnsäure.',
+      tips:null },
+    { id:'vitd', name:'Vitamin D (25-OH)', interval:'Einmal als Baseline, dann jährlich bei Mangel', typ:'empfohlen', checkable:true, monat:2,
+      was:'Bluttest auf 25-Hydroxyvitamin-D. Optimaler Bereich: 40–60 ng/ml. Über 60% der deutschen Bevölkerung hat im Winter einen Mangel.',
+      kontext:'Vitamin D ist an über 200 Körperprozessen beteiligt: Immunsystem, Muskelkraft, Stimmung, Schlaf. Wer drinnen arbeitet, braucht fast immer Supplementierung.',
+      plus:'Bei Mangel: 2000–4000 IE täglich (D3 + K2 kombiniert). Nächste Messung nach 3 Monaten. November ist der ideale Testzeitpunkt.',
+      tips:null },
+    { id:'hepatitis', name:'Hepatitis B & C Screening', interval:'Einmalig als Baseline', typ:'empfohlen', checkable:true, monat:2,
+      was:'Bluttest auf Hepatitis-B- und C-Antikörper. Ab 35 GKV-Pflicht im Check-up — vorher als IGeL (~20€). Einmalig ausreichend wenn negativ.',
+      kontext:'Hepatitis-Infektionen verlaufen jahrelang symptomlos und können zu Leberzirrhose und Leberkrebs führen.',
+      plus:'Wenn Hepatitis B negativ und keine Impfung: Impfung nachholen lassen, GKV übernimmt. Hepatitis C ist seit 2020 sehr gut heilbar — aber nur wenn bekannt.',
+      tips:null }
+  ]},
+  { id:'zahn', icon:'🦷', name:'Zahngesundheit', items:[
+    { id:'zahn-kontrolle', name:'Zahnärztliche Kontrolle', interval:'2× jährlich', typ:'pflicht', checkable:true, monat:1,
+      was:'Kariesdiagnostik, Parodontalstatus, Röntgen bei Bedarf. GKV zahlt zwei Termine pro Jahr. Bonusheft lückenlos führen — senkt langfristig Eigenanteil bei Zahnersatz erheblich.',
+      kontext:'Parodontitis ist die häufigste chronische Erkrankung beim Erwachsenen, lange symptomlos, und erhöht systemische Entzündungslast.',
+      plus:'Professionelle Zahnreinigung (PZR) 1–2× jährlich (~60–100€ Eigenanteil) — effektivste Prophylaxe. Parodontitisscreening (PSI) beim Zahnarzt ansprechen.',
+      tips:null }
+  ]},
+  { id:'haut', icon:'🔬', name:'Haut & Hautkrebsvorsorge', items:[
+    { id:'hautkrebs', name:'Hautkrebsscreening', interval:'Alle 2 Jahre', typ:'pflicht', checkable:true, monat:5,
+      was:'Ganzkörperinspektion beim Dermatologen. GKV-Pflicht ab 35 — die TK übernimmt es jedoch bereits ab 20 Jahren. Einfach mit Gesundheitskarte beim Hautarzt anmelden.',
+      kontext:'Melanom ist in der Altersgruppe 20–40 einer der häufigsten Krebstypen. Das 5-Jahres-Überleben bei frühem Stadium liegt bei über 95%.',
+      plus:'ABCDE-Regel selbst anwenden: Asymmetrie, Begrenzung, Colorierung, Durchmesser, Entwicklung — monatlich kontrollieren. Auflichtmikroskopie (~25€ Zuzahlung) ist genauer als reine Sichtdiagnose.',
+      tips:null },
+    { id:'uv', name:'UV-Schutz im Alltag', interval:'Täglich ganzjährig', typ:'empfohlen', checkable:false, monat:0,
+      was:'LSF 30–50 im Gesicht ganzjährig. UV-A-Strahlung durchdringt Wolken und Glas — auch an bewölkten Tagen und im Büro am Fenster.',
+      kontext:'Lichtbedingte Hautalterung macht ca. 80% der sichtbaren Alterungszeichen aus. Sonnenschäden akkumulieren lebenslang.',
+      plus:'Vitamin D beachten: konsequenter Sonnenschutz blockiert Vitamin-D-Synthese. Wer schützt, sollte Vitamin D supplementieren.',
+      tips:null }
+  ]},
+  { id:'augen', icon:'👁', name:'Augen & Sehkraft', items:[
+    { id:'augen', name:'Augenarztuntersuchung', interval:'Alle 2 Jahre', typ:'empfohlen', checkable:true, monat:3,
+      was:'Sehschärfe, Augeninnendruck (Glaukom-Screening), Funduskopie bei Risikofaktoren. GKV zahlt ab 40 — davor selbst (~30–60€).',
+      kontext:'Glaukom und frühe Makuladegeneration sind lange symptomlos. Bildschirmarbeit und Kurzsichtigkeit erhöhen das Risiko.',
+      plus:'20-20-20-Regel: alle 20 Minuten 20 Sekunden auf 20 Fuß Entfernung schauen. Bildschirmhelligkeit der Umgebung anpassen.',
+      tips:null }
+  ]},
+  { id:'urologie', icon:'⚕️', name:'Urologie & Hodengesundheit', items:[
+    { id:'hoden-selbst', name:'Hodenkrebs-Selbstuntersuchung', interval:'Monatlich ab sofort', typ:'pflicht', checkable:true, monat:1,
+      was:'Monatlich beide Hoden einzeln abtasten: sanft zwischen Daumen und Zeigefinger rollen. Auf Verhärtungen, Knoten, Größenveränderungen achten. Am besten nach warmem Bad. TK empfiehlt dies ab 18 Jahren.',
+      kontext:'Hodenkrebs ist zwischen 20 und 35 Jahren die häufigste Krebserkrankung des Mannes. Frühzeitig erkannt zu über 95% heilbar.',
+      plus:'Bei jeder Auffälligkeit sofort zum Urologen — jede Verhärtung ist zunächst nur eine Verhärtung, sie kann gutartig sein. Aber sie muss abgeklärt werden.',
+      tips:null },
+    { id:'urologie-info', name:'Urologische Vorsorge', interval:'Ab 45 jährlich (GKV) — jetzt: bei Symptomen', typ:'info', checkable:false, monat:0,
+      was:'Ab 45 übernimmt die GKV jährlich: Abtasten von Prostata, Genitalien und Leistenlymphknoten. Mit 33 kein Pflichttermin — aber bei Symptomen (Schmerzen, Veränderungen beim Wasserlassen) sofort zum Hausarzt.',
+      kontext:'Prostatakrebs ist die häufigste Krebserkrankung des Mannes, tritt aber fast immer erst nach 50 auf. PSA-Test umstritten, nicht GKV-Pflicht.',
+      plus:'Was jetzt relevanter ist: Hodenkrebs-Selbstuntersuchung (oben) und erektile Dysfunktion als frühen Indikator für kardiovaskuläre Probleme ernst nehmen.',
+      tips:null }
+  ]},
+  { id:'impfungen', icon:'💉', name:'Impfungen', items:[
+    { id:'impfstatus', name:'Impfstatus prüfen & auffrischen', interval:'Einmalig prüfen, dann je nach Impfung', typ:'pflicht', checkable:true, monat:2,
+      was:'Impfpass suchen und beim Hausarzt prüfen lassen. STIKO-Empfehlungen für Erwachsene: Tetanus/Diphtherie/Pertussis alle 10 Jahre, Masern einmalig wenn nach 1970 geboren, Hepatitis B wenn nicht geimpft.',
+      kontext:'Die meisten Erwachsenen wissen nicht, wann sie zuletzt geimpft wurden. Alle GKV-empfohlenen Impfungen werden übernommen.',
+      plus:'HPV-Impfung: bis 26 Jahre GKV-Pflicht, danach auf eigene Kosten möglich. Influenza ab 60 GKV-Pflicht, jünger bei Kontakt mit Risikopersonen sinnvoll.',
+      tips:null }
+  ]},
+  { id:'ernaehrung', icon:'🥗', name:'Ernährung & Flüssigkeit', items:[
+    { id:'mikro', name:'Mikronährstoffanalyse', interval:'Einmal als Baseline', typ:'empfohlen', checkable:true, monat:3,
+      was:'Labor auf: Vitamin D, B12, Folsäure, Ferritin (Eisen), Magnesium, Zink, Omega-3-Index. Hausarzt oder privat (~80–150€).',
+      kontext:'Suboptimale Spiegel ohne klassische Mangelsymptome beeinflussen Energie, Stimmung und Kognition — besonders bei Stress und wenig Schlaf.',
+      plus:'Omega-3-Index: optimal über 8%. In westlicher Ernährung fast immer zu niedrig. Fettreicher Fisch 2× pro Woche oder hochwertiges Fischöl.',
+      tips:{ items:[
+        'Proteinzufuhr: 1,6–2g pro kg Körpergewicht täglich. Gute Quellen: Hülsenfrüchte, Eier, Hühnchen, Quark, Fisch.',
+        'Ballaststoffe: mindestens 30g täglich — Darm, Cholesterin, Blutzucker hängen alle daran. Haferflocken, Linsen, Vollkornbrot, Gemüse.',
+        'Zucker und Weißmehl reduzieren: nicht verbieten, aber Bewusstsein schaffen. Blutzuckerspitzen fördern Entzündungen.',
+        'Fermentierte Lebensmittel fürs Mikrobiom: Joghurt, Kefir, Sauerkraut — wenig, aber regelmäßig.',
+        'Alkohol ehrlich betrachten: mehr als 14 Einheiten pro Woche gilt als gesundheitsschädlich. 1 Einheit = 1 kleines Bier oder 1 Glas Wein.'
+      ]}
+    },
+    { id:'wasser', name:'Flüssigkeitsaufnahme', interval:'Täglich — Gewohnheit etablieren', typ:'info', checkable:false, monat:0,
+      was:'Empfehlung: ca. 35 ml pro kg Körpergewicht täglich. Bei 75 kg etwa 2,6 Liter. An Sporttagen mehr. Kaffee und Tee zählen, Alkohol nicht.',
+      kontext:'Chronische leichte Dehydration ist weit verbreitet und beeinflusst Konzentration, Stimmung und Energielevel — ohne dass man "Durst" empfindet. Das Durstgefühl hinkt dem Bedarf hinterher.',
+      plus:null,
+      tips:{ items:[
+        'Morgens direkt nach dem Aufstehen ein großes Glas Wasser — der Körper ist nach dem Schlaf leicht dehydriert.',
+        'Wasserflasche sichtbar auf dem Schreibtisch: was man sieht, trinkt man. Im Rucksack vergisst man sie.',
+        'Heller Urin = gut hydriert. Dunkler Urin = zu wenig getrunken.',
+        'Kaffee ist kein Feind: bis 3–4 Tassen täglich unproblematisch. Aber nicht als Wasser-Ersatz nutzen.',
+        'Sportgetränke und Säfte nur nach echter Belastung — sonst ist es Zuckerwasser.'
+      ]}
+    }
+  ]},
+  { id:'bewegung', icon:'🦴', name:'Bewegung, Haltung & Mobilität', items:[
+    { id:'haltung', name:'Haltungsanalyse', interval:'Einmal als Baseline', typ:'empfohlen', checkable:true, monat:4,
+      was:'Physiotherapeutische Analyse: Beckenschiefstand, Wirbelsäulenform, muskuläre Dysbalancen. Ca. 40–80€, nicht GKV.',
+      kontext:'Schreibtischberufe erzeugen typische Dysbalancen: verkürzte Hüftbeuger, schwache Gesäßmuskulatur, Rundrücken. Diese entstehen über Jahre still.',
+      plus:'Krafttraining für tiefen Rücken und Gesäß ist effektiver als Dehnen. Standing Desk oder Positionswechsel alle 45 Minuten.',
+      tips:{ items:[
+        'WHO-Empfehlung: mindestens 150 Min. moderate Bewegung pro Woche oder 75 Min. intensiv. Plus 2× Krafttraining.',
+        '10.000 Schritte ist eine Marketingzahl — aber 7.000–8.000 Schritte täglich zeigen messbare Gesundheitsvorteile.',
+        'Sitzen ist das Problem — nicht der Mangel an Sport. Kurze Unterbrechungen alle 45 Min. sind effektiver als ein Spaziergang am Abend.',
+        'Treppensteigen ist das einzige echte HIIT ohne Zeitaufwand.',
+        'Krafttraining 2× pro Woche: beugt Muskelmasseverlust ab 35 vor, verbessert Insulinsensitivität, schützt Knochen.'
+      ]}
+    },
+    { id:'mobilitaet', name:'Mobilität & Flexibilität', interval:'Täglich 10 Minuten', typ:'empfohlen', checkable:false, monat:0,
+      was:'Selbsttest: Tiefer Squat (Fersen am Boden, Rücken gerade), Overhead-Reach (Arme gerade über Kopf ohne Hohlkreuz), Hip Hinge (Vorbeuge mit geradem Rücken).',
+      kontext:'Mobilität ist ein besserer Langzeitgesundheitsindikator als Kraft allein. Der Sitting-Rising Test (vom Boden ohne Hände aufstehen) ist ein validierter Prädiktor für Lebenserwartung.',
+      plus:'10 Min. täglich gezieltes Mobilitätstraining (FRC-Protokoll) wirkt mehr als gelegentliches Stretching. Priorität: Hüften, thorakale Wirbelsäule, Schultern.',
+      tips:{ items:[
+        'Hüftöffner täglich: 90/90-Position, je 2 Minuten pro Seite — gegen verkürzte Hüftbeuger vom Sitzen.',
+        'Thoraxrotation: auf allen Vieren, eine Hand hinter den Kopf, Ellbogen so weit wie möglich nach oben drehen. 10× pro Seite.',
+        'Tiefer Squat halten: 5 Minuten täglich akkumuliert (nicht am Stück) ergibt messbare Verbesserung.',
+        'Yoga und Pilates sind unterschätzte Kraftformen — nicht nur Stretching, sondern echte Stabilität.',
+        'Schulterkreisen vor dem Schreibtisch: sieht albern aus, hält die thorakale Mobilität.'
+      ]}
+    },
+    { id:'schlaf', name:'Schlafqualität objektivieren', interval:'Einmalig als Baseline', typ:'empfohlen', checkable:true, monat:6,
+      was:'Schlaftracking über 2–4 Wochen mit Wearable oder App (Sleep Cycle). Eigene Muster verstehen: Einschlafzeit, Tiefschlafanteil, Aufwacher.',
+      kontext:'Chronischer Schlafmangel erhöht das Risiko für Diabetes, Herz-Kreislauf-Erkrankungen und Depression stärker als fast jeder andere Lebensstilfaktor. Unter 7 Stunden regelmäßig gilt als klinisch relevant.',
+      plus:'Schlafhygiene: Raumtemperatur 17–19°C, vollständige Dunkelheit, kein Alkohol (zerstört Tiefschlaf), gleichmäßige Schlafzeiten auch am Wochenende.',
+      tips:null }
+  ]}
+];
+
+const KALENDER = {
+  1:['Blutdruck messen','Zahnarzt (1. Termin)','Hodencheck-Routine starten'],
+  2:['Blutbild & Vitamin D','Impfpass prüfen','Check-up 18–34 (falls noch nicht erledigt)'],
+  3:['Augenarzt','Mikronährstoffanalyse'],
+  4:['Haltungsanalyse','Sonnenschutz etablieren'],
+  5:['Hautkrebsscreening (TK ab 20)'],
+  6:['Schlaftracking starten'],
+  7:[],8:[],
+  9:['Zahnarzt (2. Termin)','Blutdruck kontrollieren'],
+  10:[],
+  11:['Vitamin D Spiegel prüfen (Winterbeginn)'],
+  12:['Jahresrückblick — was fehlt noch?']
+};
+
+function getState() {
+  try { const s = localStorage.getItem('vorsorge-v2'); return s ? JSON.parse(s) : {erledigt:{},daten:{},notizen:{}}; }
+  catch { return {erledigt:{},daten:{},notizen:{}}; }
+}
+function saveState() { try { localStorage.setItem('vorsorge-v2', JSON.stringify(state)); } catch {} }
+let state = getState();
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelector('.nav-link[data-page="'+id+'"]').classList.add('active');
+  window.scrollTo(0,0);
+  if (id === 'kalender') renderKalender();
+}
+
+const YEAR = new Date().getFullYear();
+const MONTH = new Date().getMonth() + 1;
+
+function isFaellig(item) {
+  if (!item.checkable) return false;
+  if (!state.daten[item.id]) return item.monat > 0 && item.monat <= MONTH;
+  return parseInt(state.daten[item.id].slice(0,4)) < YEAR;
+}
+
+function renderAll() {
+  document.getElementById('year-label').textContent = YEAR;
+  let total=0, done=0, due=0;
+  B.forEach(b => b.items.forEach(i => {
+    if (!i.checkable) return;
+    total++;
+    if (state.erledigt[i.id+'_'+YEAR]) done++;
+    else if (isFaellig(i)) due++;
+  }));
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-due').textContent = due;
+
+  const container = document.getElementById('bereiche-container');
+  container.innerHTML = '';
+
+  B.forEach(bereich => {
+    const checkable = bereich.items.filter(i => i.checkable);
+    const bDone = checkable.filter(i => state.erledigt[i.id+'_'+YEAR]).length;
+    const pct = checkable.length ? bDone/checkable.length*100 : 0;
+
+    const div = document.createElement('div');
+    div.className = 'bereich';
+    div.innerHTML = `<div class="bereich-header"><span class="bereich-icon">${bereich.icon}</span><span class="bereich-name">${bereich.name}</span><div class="bereich-progress"><div class="bp-track"><div class="bp-fill" style="width:${pct}%"></div></div><span class="bp-count">${bDone}/${checkable.length}</span></div></div><div class="untersuchung-list"></div>`;
+    container.appendChild(div);
+    const list = div.querySelector('.untersuchung-list');
+
+    bereich.items.forEach(item => {
+      const erledigt = item.checkable && !!state.erledigt[item.id+'_'+YEAR];
+      const faellig = item.checkable && !erledigt && isFaellig(item);
+
+      const tagClass = item.typ === 'pflicht' ? 'pflicht' : item.typ === 'info' ? 'info-tag' : 'empfohlen';
+      const tagLabel = item.typ === 'pflicht' ? 'GKV' : item.typ === 'info' ? 'Info' : 'Empfohlen';
+      const statusTag = erledigt ? `<span class="u-tag erledigt-tag">✓ ${YEAR}</span>` : faellig ? `<span class="u-tag faellig-tag">Fällig</span>` : '';
+      const cardClass = erledigt ? 'erledigt' : faellig ? 'faellig' : item.typ === 'empfohlen' ? 'optional' : item.typ === 'info' ? 'info-card' : '';
+
+      const plusHtml = item.plus ? `<div class="plus-box full"><p>${item.plus}</p></div>` : '';
+      const tipsHtml = item.tips ? `<div class="tip-box full"><ul>${item.tips.items.map(t=>`<li>${t}</li>`).join('')}</ul></div>` : '';
+      const datumHtml = item.checkable ? `<div class="datum-row"><span class="datum-label">Zuletzt:</span><input type="date" class="datum-input" value="${state.daten[item.id]||''}" id="datum-${item.id}"><button class="datum-save" data-id="${item.id}">Speichern</button><span class="datum-saved-msg" id="msg-${item.id}">Gespeichert ✓</span></div>` : '';
+
+      const card = document.createElement('div');
+      card.className = `u-card ${cardClass}`;
+      card.innerHTML = `
+        <div class="u-top">
+          <div class="u-check ${item.checkable?'':'no-check'}"><span class="u-check-icon">✓</span></div>
+          <div class="u-info">
+            <div class="u-meta"><span class="u-tag ${tagClass}">${tagLabel}</span>${statusTag}<span class="u-interval">${item.interval}</span></div>
+            <div class="u-name">${item.name}</div>
+          </div>
+          <div class="u-expand">▾</div>
+        </div>
+        <div class="u-detail">
+          <div class="detail-grid">
+            <div class="detail-block"><h4>Was & Wie</h4><p>${item.was}</p></div>
+            <div class="detail-block"><h4>Warum wichtig</h4><p>${item.kontext}</p></div>
+            ${plusHtml}${tipsHtml}${datumHtml}
+            <textarea class="notiz-area" placeholder="Notizen, Ergebnisse, nächster Termin..." data-id="${item.id}">${state.notizen[item.id]||''}</textarea>
+          </div>
+        </div>`;
+
+      card.querySelector('.u-top').addEventListener('click', e => {
+        if (e.target.closest('.u-check') && item.checkable) return;
+        card.classList.toggle('open');
+      });
+      if (item.checkable) {
+        card.querySelector('.u-check').addEventListener('click', e => {
+          e.stopPropagation();
+          const key = item.id+'_'+YEAR;
+          state.erledigt[key] = !state.erledigt[key];
+          saveState(); renderAll();
+        });
+        const btn = card.querySelector('.datum-save');
+        if (btn) btn.addEventListener('click', () => {
+          const val = document.getElementById('datum-'+item.id)?.value;
+          if (val) {
+            state.daten[item.id] = val; saveState();
+            const msg = document.getElementById('msg-'+item.id);
+            if (msg) { msg.style.display='inline'; setTimeout(()=>msg.style.display='none',2000); }
+          }
+        });
+      }
+      card.querySelector('.notiz-area').addEventListener('input', e => { state.notizen[item.id]=e.target.value; saveState(); });
+      list.appendChild(card);
+    });
+  });
+}
+
+function renderKalender() {
+  const grid = document.getElementById('kalender-grid');
+  grid.innerHTML = '';
+  const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  for (let m=1; m<=12; m++) {
+    const items = KALENDER[m]||[];
+    const card = document.createElement('div');
+    card.className = 'monat-card';
+    card.style.borderTop = m===MONTH ? '2px solid var(--accent)' : '2px solid transparent';
+    const itemsHTML = items.length===0 ? '<div class="monat-empty">–</div>'
+      : items.map(n=>`<div class="monat-item${m<MONTH?' past':m===MONTH?' cur':''}">${n}</div>`).join('');
+    card.innerHTML = `<div class="monat-name">${MONATE[m-1]}</div><div class="monat-items">${itemsHTML}</div>`;
+    grid.appendChild(card);
+  }
+}
+
+function exportData() {
+  const data = localStorage.getItem('vorsorge-v2')||'{}';
+  const blob = new Blob([data],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='vorsorge-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+}
+function importData() {
+  const input = document.createElement('input');
+  input.type='file'; input.accept='.json';
+  input.onchange = e => {
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload = ev => {
+      try {
+        const parsed=JSON.parse(ev.target.result);
+        localStorage.setItem('vorsorge-v2',JSON.stringify(parsed));
+        state=parsed; renderAll();
+        document.getElementById('sync-msg').textContent='Importiert ✓';
+        setTimeout(()=>document.getElementById('sync-msg').textContent='',3000);
+      } catch { alert('Datei konnte nicht gelesen werden.'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+renderAll();
+</script>
+</body>
+</html>
