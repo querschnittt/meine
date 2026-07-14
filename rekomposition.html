@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Wochenkompass">
+<title>Wochenkompass · Recomposition</title>
+<style>
+  :root{
+    --bg:#F2F1EA; --card:#FDFCF7; --border:#DEDCCB; --border2:#D8D6C8;
+    --ink:#22271E; --ink-soft:#4A4F43; --muted:#6B6F60;
+    --green:#5B6B3C; --green-dark:#3D5A3C; --tan:#8A6D3B; --blue:#1F3A4D;
+    --orange:#B5651D; --orange-bg:#B5651D18;
+    --warn-bg:#F7E4DF; --warn-border:#E4C4BC; --warn-ink:#8A3B2E;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;}
+  body{padding-bottom:env(safe-area-inset-bottom);}
+  .app{max-width:480px; margin:0 auto; padding:20px 16px 40px;}
+  .eyebrow{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--green); font-weight:700;}
+  h1{font-family:Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size:32px; font-weight:600; margin:2px 0 4px; letter-spacing:-0.01em;}
+  .subline{font-size:12.5px; color:var(--muted); margin:0 0 14px;}
+  .statusPill{display:inline-flex; align-items:center; gap:8px; color:#F2F1EA; font-size:12.5px;
+    font-weight:600; padding:7px 14px; border-radius:999px; margin-bottom:10px;}
+  .statusDot{width:8px; height:8px; border-radius:50%;}
+
+  .panel{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:12px;}
+  .panelHead{display:flex; justify-content:space-between; align-items:center; cursor:pointer;}
+  .panelTitle{font-weight:700; font-size:13.5px; color:#3B402F;}
+  .chev{font-size:12px; color:var(--muted); transition:transform .15s;}
+  .chev.open{transform:rotate(180deg);}
+  .panelBody{margin-top:10px; display:none;}
+  .panelBody.open{display:block;}
+
+  .weekdayGrid{display:flex; gap:5px; flex-wrap:wrap;}
+  .toggleChip{flex:1 1 12%; min-width:38px; padding:8px 0; text-align:center; border-radius:8px;
+    border:1.5px solid var(--border2); background:var(--bg); font-weight:700; font-size:12px;
+    color:var(--ink-soft); cursor:pointer;}
+  .toggleChip.on{background:var(--orange); border-color:var(--orange); color:#fff;}
+  .toggleChip.disabled{opacity:.4; cursor:not-allowed;}
+  .fieldLabel{font-size:11.5px; color:var(--muted); margin:12px 0 6px;}
+  select.fastSelect{width:100%; padding:9px 10px; border-radius:8px; border:1.5px solid var(--border2);
+    background:var(--bg); font-size:13.5px; font-weight:600; color:var(--ink);}
+  .warnBox{margin-top:10px; font-size:11.5px; color:var(--warn-ink); background:var(--warn-bg);
+    border:1px solid var(--warn-border); border-radius:8px; padding:8px 10px; line-height:1.45;}
+  .okBox{margin-top:10px; font-size:11.5px; color:var(--green-dark); background:#E7EFE0;
+    border:1px solid #CFE0C0; border-radius:8px; padding:8px 10px; line-height:1.45;}
+
+  .tabs{display:flex; gap:8px; margin-bottom:14px;}
+  .tabBtn{flex:1; padding:9px 0; border-radius:8px; border:1px solid var(--border2);
+    background:var(--card); font-weight:700; font-size:13px; color:var(--muted); cursor:pointer;}
+  .tabBtn.active{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+
+  .dayRow{display:flex; gap:6px; margin-bottom:12px;}
+  .dayBtn{flex:1; position:relative; padding:10px 0 6px; border-radius:8px; border:1px solid var(--border2);
+    background:var(--card); font-weight:700; font-size:13px; color:var(--ink-soft); cursor:pointer;}
+  .dayBtn.sel{background:var(--green); color:var(--bg); border-color:var(--green);}
+  .dayBtn.fasting{border-style:dashed;}
+  .dayBtn.fasting.sel{background:var(--blue); border-color:var(--blue); border-style:solid;}
+  .dayBtn.training:not(.sel){box-shadow:inset 0 -3px 0 var(--orange);}
+  .dayIcon{display:block; font-size:9px; margin-top:2px; opacity:.85;}
+  .todayMark{position:absolute; top:3px; right:6px; width:4px; height:4px; border-radius:50%; background:currentColor;}
+
+  .dayLabel{display:flex; align-items:baseline; gap:10px; margin-bottom:4px;
+    font-family:Charter, "Iowan Old Style", Georgia, serif; font-size:20px;}
+  .setLabel{font-size:12px; font-family:-apple-system,sans-serif; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;}
+  .setLabel.training{color:var(--orange);}
+  .setLabel.rest{color:var(--green);}
+  .setLabel.fasting{color:var(--blue);}
+  .targetLine{font-size:11.5px; color:var(--muted); margin-bottom:14px;}
+
+  .timeline{margin-bottom:18px;}
+  .entry{display:flex; gap:4px; cursor:pointer; border-radius:10px; padding:8px 8px 0 0; align-items:flex-start;}
+  .entry:active{background:rgba(91,107,60,0.08);}
+  .entry.done .entryTitle, .entry.done .entryDesc, .entry.done .kcalTag{opacity:.5;}
+  .timeCol{display:flex; flex-direction:column; align-items:center; width:62px; flex-shrink:0;}
+  .timeText{font-size:11.5px; font-weight:700; color:var(--green); margin-bottom:4px; font-variant-numeric:tabular-nums;}
+  .node{width:12px; height:12px; border-radius:50%; border:2.5px solid var(--green); background:var(--bg);}
+  .node.ritual{border-color:var(--blue); border-style:dotted;}
+  .lineDown{width:2px; flex-grow:1; background:var(--border2); margin-top:4px; min-height:16px;}
+  .entryBody{flex-grow:1; padding-bottom:18px;}
+  .entryHead{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .entryTitle{font-weight:700; font-size:15px;}
+  .kcalTag{font-size:11.5px; font-weight:700; color:var(--tan); white-space:nowrap;}
+  .entryDesc{font-size:13px; line-height:1.5; margin:4px 0 6px; color:var(--ink-soft);}
+  .macroRow{display:flex; gap:6px; flex-wrap:wrap;}
+  .macro{font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; letter-spacing:.02em;}
+  .check{width:24px; height:24px; border-radius:7px; border:1.5px solid #C9C7B8; display:flex;
+    align-items:center; justify-content:center; font-size:14px; color:var(--bg); flex-shrink:0;
+    margin-top:2px; background:var(--card);}
+  .check.on{background:var(--green); border-color:var(--green);}
+
+  .summary{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 16px; box-shadow:0 1px 3px rgba(34,39,30,0.06);}
+  .sumKcalNum{font-size:26px; font-weight:700;}
+  .sumKcalLbl{font-size:12px; opacity:.7;}
+  .macroBarOuter{display:flex; height:10px; border-radius:5px; overflow:hidden; margin:10px 0 6px;}
+  .macroLegend{display:flex; gap:14px; font-size:11px; opacity:.85; flex-wrap:wrap;}
+  .sumHint{font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.5;}
+
+  .shopGroup{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:12px;}
+  .shopHead{display:flex; justify-content:space-between; font-weight:700; font-size:13.5px; margin-bottom:2px; color:#3B402F; letter-spacing:.02em;}
+  .shopSub{font-size:11px; color:var(--muted); margin-bottom:8px;}
+  .shopCount{color:var(--green); font-variant-numeric:tabular-nums;}
+  .shopItem{display:flex; align-items:center; gap:10px; padding:7px 4px; font-size:13.5px; cursor:pointer; border-radius:6px;}
+  .shopItem:active{background:rgba(91,107,60,0.08);}
+  .shopItem.on span{opacity:.5; text-decoration:line-through;}
+  .box{width:20px; height:20px; border-radius:6px; border:1.5px solid #C9C7B8; display:flex;
+    align-items:center; justify-content:center; font-size:12px; color:var(--bg); flex-shrink:0; background:var(--card);}
+  .box.on{background:var(--green); border-color:var(--green);}
+  .shopNote{font-size:11.5px; color:var(--muted); line-height:1.55; padding:0 4px;}
+
+  .resetBtn{width:100%; padding:11px 0; margin-bottom:12px; border-radius:10px;
+    border:1.5px dashed #B0AE9E; background:transparent; font-weight:700; font-size:12.5px; color:var(--muted); cursor:pointer;}
+  .resetBtn:active{border-color:var(--green); color:var(--green); background:rgba(91,107,60,0.06);}
+  .offlineNote{font-size:10.5px; color:var(--muted); text-align:center; margin-top:24px; opacity:.7;}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="eyebrow">13 : 21 · Body Recomposition · vegetarisch</div>
+  <h1>Wochenkompass</h1>
+  <p class="subline">70 kg halten · Muskeln auf, Fett ab · Carb-Cycling</p>
+  <div id="statusPill" class="statusPill" style="display:none;">
+    <span class="statusDot" id="statusDot"></span>
+    <span id="statusMsg"></span>
+  </div>
+
+  <div class="panel">
+    <div class="panelHead" onclick="togglePanel()">
+      <span class="panelTitle">⚙️ Trainingstage &amp; Fastentag einstellen</span>
+      <span class="chev" id="panelChev">▾</span>
+    </div>
+    <div class="panelBody" id="panelBody">
+      <div class="fieldLabel">Trainingstage (bestimmt High-Carb-Tage)</div>
+      <div class="weekdayGrid" id="trainGrid"></div>
+      <div class="fieldLabel">Fastentag (24 h)</div>
+      <select class="fastSelect" id="fastSelect" onchange="onFastDayChange(this.value)"></select>
+      <div id="fastWarning"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tabBtn active" id="tabPlanBtn" onclick="setTab('plan')">Tagesplan</button>
+    <button class="tabBtn" id="tabShopBtn" onclick="setTab('shop')">Einkaufsliste</button>
+  </div>
+
+  <div id="planView"></div>
+  <div id="shopView" style="display:none;"></div>
+
+  <div class="offlineNote">Läuft vollständig offline · Daten bleiben lokal auf diesem Gerät gespeichert</div>
+</div>
+
+<script>
+// ---------- Grunddaten ----------
+const DAYS = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+const DAYS_SHORT = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+
+// Makro-Zielwerte (konstant Protein/Fett, Carb-Cycling)
+const TARGETS = {
+  training: {kcal:2010, p:140, f:63, kh:220},
+  rest:     {kcal:1570, p:140, f:63, kh:110},
+  fasting:  {kcal:500,  p:35,  f:15, kh:55},
+};
+
+const TRAINING_MEALS = [
+  {title:"Hafer-Skyr-Bowl", desc:"60 g Haferflocken mit 200 g Skyr, 1 Banane, 1 EL Honig, 15 g Walnüsse", kcal:650, p:35, f:18, kh:80},
+  {title:"Wrap mit Hüttenkäse & Beeren", desc:"1 Vollkorn-Wrap gefüllt mit 150 g Hüttenkäse, 1 EL Honig, 100 g Beeren", kcal:500, p:30, f:12, kh:70},
+  {title:"Kartoffel-Kichererbsen-Pfanne", desc:"300 g Kartoffeln, 150 g Kichererbsen, 2 Eier, 50 g Feta — dein Post-Workout-Teller", kcal:860, p:75, f:33, kh:70},
+];
+
+const REST_MEALS = [
+  {title:"Rührei mit Gemüse & Avocado", desc:"3 Eier mit Spinat, Champignons, 1/2 Avocado", kcal:520, p:32, f:38, kh:8},
+  {title:"Chia-Skyr mit Beeren", desc:"150 g Skyr, 1 EL Leinsamen, 80 g Beeren, 15 g Mandeln", kcal:350, p:28, f:14, kh:22},
+  {title:"Linsen-Gemüse-Curry", desc:"100 g Linsen mit Zucchini, Paprika, Brokkoli, Topping Hüttenkäse", kcal:700, p:80, f:11, kh:80},
+];
+
+const FASTBRECHEN = {title:"Linsen-Gemüsesuppe", desc:"80 g Linsen, Karotte, Zucchini, Sellerie, Topping griech. Joghurt — leicht & proteinreich nach 24 h", kcal:500, p:35, f:15, kh:55};
+
+// Zutaten pro Tages-Typ (für dynamische Einkaufsliste)
+const TRAINING_INGREDIENTS = [
+  ["Haferflocken","60 g"], ["Skyr / Joghurt","200 g"], ["Banane","1 Stück"], ["Honig","2 EL"],
+  ["Walnüsse","15 g"], ["Vollkorn-Wrap","1 Stück"], ["Hüttenkäse","150 g"], ["Beeren","100 g"],
+  ["Kartoffeln","300 g"], ["Kichererbsen (Dose)","150 g"], ["Eier","2 Stück"], ["Feta","50 g"],
+];
+const REST_INGREDIENTS = [
+  ["Eier","3 Stück"], ["Spinat","80 g"], ["Champignons","100 g"], ["Avocado","0,5 Stück"],
+  ["Skyr","150 g"], ["Leinsamen","1 EL"], ["Beeren","80 g"], ["Mandeln","15 g"],
+  ["Linsen","100 g"], ["Zucchini","100 g"], ["Paprika","100 g"], ["Brokkoli","100 g"], ["Hüttenkäse","100 g"],
+];
+const FAST_INGREDIENTS = [
+  ["Linsen","80 g"], ["Karotte","1 Stück"], ["Zucchini (klein)","1 Stück"], ["Sellerie","etwas"], ["Griech. Joghurt","100 g"],
+];
+const GRUNDVORRAT = ["Flohsamenschalen","Apfelessig","Olivenöl","Honig (Vorrat)","Salz, Pfeffer, Gewürze"];
+
+// ---------- Zustand ----------
+const STORAGE_KEY = "wochenkompass-recomp-v1";
+let state = {
+  trainingDays: [false,true,false,true,false,true,false], // Standard: Di, Do, Sa
+  fastDayOverride: null,
+  done:{}, bought:{}
+};
+let saveOk = true;
+try {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) state = Object.assign(state, JSON.parse(raw));
+} catch(e){ saveOk = false; }
+
+function persist(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ /* stiller Fallback: Zustand bleibt zumindest für diese Sitzung erhalten */ }
+}
+
+let tab = "plan";
+const todayIdx = (new Date().getDay() + 6) % 7;
+let dayIdx = todayIdx;
+let panelOpen = false;
+
+// ---------- Trainingstage / Fastentag-Logik ----------
+function trainingIndices(){
+  const out = [];
+  state.trainingDays.forEach((v,i)=>{ if(v) out.push(i); });
+  return out;
+}
+function thirdTrainingDay(){
+  const idx = trainingIndices();
+  if (idx.length===0) return null;
+  const n = Math.min(3, idx.length);
+  return idx[n-1];
+}
+function recommendedFastDay(){
+  const t = thirdTrainingDay();
+  if (t===null) return 0;
+  return (t+2)%7;
+}
+function currentFastDay(){
+  return state.fastDayOverride!==null ? state.fastDayOverride : recommendedFastDay();
+}
+function fastDayWarning(){
+  const t = thirdTrainingDay();
+  if (t===null) return null;
+  const fd = currentFastDay();
+  const diff = ((fd - t) % 7 + 7) % 7;
+  if (diff===1 || diff===2) return null;
+  return "Dein Fastentag liegt aktuell "+diff+" Tag(e) nach deiner letzten Trainingseinheit. Empfohlen sind 1–2 Tage (24–48 h) Abstand zur Regeneration — sonst startest du das Fasten direkt am oder zu weit vom Trainingstag entfernt.";
+}
+function dayType(i){
+  if (i===currentFastDay()) return 'fasting';
+  return state.trainingDays[i] ? 'training' : 'rest';
+}
+
+// ---------- Zeitfenster-Status ----------
+function fmtDur(m){ return m>=60 ? Math.floor(m/60)+" h "+(m%60)+" min" : m+" min"; }
+function eatingWindowStatus(i){
+  const now = new Date();
+  const mins = now.getHours()*60 + now.getMinutes();
+  const type = dayType(i);
+  if (type==='fasting'){
+    const start = 21*60;
+    if (mins<start) return {inWindow:false, msg:"Fastentag — Fastenbrechen um 21:00 (noch "+fmtDur(start-mins)+")"};
+    return {inWindow:true, msg:"Fastenbrechen-Fenster geöffnet"};
+  }
+  const start = 13*60, end = 21*60;
+  if (mins<start) return {inWindow:false, msg:"Fastenfenster — Essensfenster öffnet in "+fmtDur(start-mins)};
+  if (mins<=end) return {inWindow:true, msg:"Essensfenster — schließt in "+fmtDur(end-mins)};
+  return {inWindow:false, msg:"Fastenfenster — bis morgen 13:00"};
+}
+
+// ---------- Tagesplan-Einträge ----------
+function buildEntries(type){
+  if (type==='fasting'){
+    return [
+      {time:"ganztägig", title:"Nur Wasser & Tee", desc:"Wasser, ungesüßter Tee, ggf. Elektrolyte", kcal:0, type:"ritual"},
+      {time:"20:45", title:"Flohsamenschalen", desc:"1 EL mit 350–400 ml Wasser", kcal:0, type:"ritual"},
+      {time:"21:00", title:"Fastenbrechen: "+FASTBRECHEN.title, desc:FASTBRECHEN.desc, kcal:FASTBRECHEN.kcal, p:FASTBRECHEN.p, f:FASTBRECHEN.f, kh:FASTBRECHEN.kh, type:"meal"},
+    ];
+  }
+  const meals = type==='training' ? TRAINING_MEALS : REST_MEALS;
+  return [
+    {time:"12:45", title:"Flohsamenschalen", desc:"1 EL mit 350–400 ml Wasser", kcal:0, type:"ritual"},
+    {time:"13:00", title:meals[0].title, desc:meals[0].desc, kcal:meals[0].kcal, p:meals[0].p, f:meals[0].f, kh:meals[0].kh, type:"meal"},
+    {time:"16:45", title:"Apfelessig", desc:"1–2 EL Apfelessig mit 400 ml Wasser", kcal:0, type:"ritual"},
+    {time:"17:00", title:meals[1].title, desc:meals[1].desc, kcal:meals[1].kcal, p:meals[1].p, f:meals[1].f, kh:meals[1].kh, type:"meal"},
+    {time:"21:00", title:meals[2].title, desc:meals[2].desc, kcal:meals[2].kcal, p:meals[2].p, f:meals[2].f, kh:meals[2].kh, type:"meal"},
+  ];
+}
+
+// ---------- UI-Aktionen ----------
+function togglePanel(){
+  panelOpen = !panelOpen;
+  document.getElementById('panelBody').classList.toggle('open', panelOpen);
+  document.getElementById('panelChev').classList.toggle('open', panelOpen);
+}
+function toggleTrainingDay(i){
+  if (i===currentFastDay()) return; // Fastentag kann nicht gleichzeitig Trainingstag sein
+  state.trainingDays[i] = !state.trainingDays[i];
+  persist();
+  renderAll();
+}
+function onFastDayChange(val){
+  state.fastDayOverride = parseInt(val,10);
+  // Falls dieser Tag zufällig auch als Trainingstag markiert war: Konflikt auflösen
+  if (state.trainingDays[state.fastDayOverride]) state.trainingDays[state.fastDayOverride] = false;
+  persist();
+  renderAll();
+}
+function setTab(t){
+  tab = t;
+  document.getElementById('tabPlanBtn').classList.toggle('active', t==='plan');
+  document.getElementById('tabShopBtn').classList.toggle('active', t==='shop');
+  document.getElementById('planView').style.display = t==='plan' ? '' : 'none';
+  document.getElementById('shopView').style.display = t==='shop' ? '' : 'none';
+  renderAll();
+}
+function selectDay(i){ dayIdx = i; renderAll(); }
+function toggleDone(key){ state.done[key] = !state.done[key]; persist(); renderPlan(); }
+function toggleBought(key){ state.bought[key] = !state.bought[key]; persist(); renderShop(); }
+function resetWeek(){ state.done={}; state.bought={}; persist(); renderAll(); }
+
+// ---------- Rendering: Einstellungen ----------
+function renderSettings(){
+  const grid = document.getElementById('trainGrid');
+  let html = '';
+  DAYS_SHORT.forEach((d,i)=>{
+    const isFast = i===currentFastDay();
+    const on = state.trainingDays[i];
+    html += '<div class="toggleChip '+(on?'on':'')+' '+(isFast?'disabled':'')+'" '
+      + (isFast ? '' : 'onclick="toggleTrainingDay('+i+')"') + '>'+d+'</div>';
+  });
+  grid.innerHTML = html;
+
+  const sel = document.getElementById('fastSelect');
+  const cur = currentFastDay();
+  sel.innerHTML = DAYS.map((d,i)=>'<option value="'+i+'" '+(i===cur?'selected':'')+'>'+d+'</option>').join('');
+
+  const warn = fastDayWarning();
+  document.getElementById('fastWarning').innerHTML = warn
+    ? '<div class="warnBox">⚠️ '+warn+'</div>'
+    : '<div class="okBox">✓ Abstand zur letzten Trainingseinheit passt (24–48 h Regeneration).</div>';
+}
+
+// ---------- Rendering: Status ----------
+function renderStatus(){
+  const pill = document.getElementById('statusPill');
+  if (dayIdx !== todayIdx){ pill.style.display='none'; return; }
+  const s = eatingWindowStatus(dayIdx);
+  pill.style.display = 'inline-flex';
+  pill.style.background = s.inWindow ? 'var(--green-dark)' : 'var(--blue)';
+  document.getElementById('statusDot').style.background = s.inWindow ? '#B7E4A8' : '#9FC4DE';
+  document.getElementById('statusMsg').textContent = s.msg;
+}
+
+// ---------- Rendering: Tagesplan ----------
+function renderPlan(){
+  renderStatus();
+  const type = dayType(dayIdx);
+  const entries = buildEntries(type);
+  const day = DAYS[dayIdx];
+
+  let html = '<div class="dayRow">';
+  DAYS.forEach((d,i)=>{
+    const t = dayType(i);
+    const sel = i===dayIdx ? 'sel' : '';
+    const cls = t==='fasting' ? 'fasting' : (t==='training' ? 'training' : '');
+    const icon = t==='fasting' ? '⏳' : (t==='training' ? '💪' : '');
+    html += '<button class="dayBtn '+sel+' '+cls+'" onclick="selectDay('+i+')">'+DAYS_SHORT[i]
+      + (icon ? '<span class="dayIcon">'+icon+'</span>' : '<span class="dayIcon">&nbsp;</span>')
+      + (i===todayIdx ? '<span class="todayMark"></span>' : '') + '</button>';
+  });
+  html += '</div>';
+
+  const labelCls = type;
+  const labelText = type==='fasting' ? 'Fastentag · 24 h' : (type==='training' ? 'Trainingstag · High Carb' : 'Ruhetag · Low Carb');
+  html += '<div class="dayLabel"><strong>'+day+'</strong><span class="setLabel '+labelCls+'">'+labelText+'</span></div>';
+  const tgt = TARGETS[type];
+  html += '<div class="targetLine">Ziel: ~'+tgt.kcal+' kcal · '+tgt.p+' g P / '+tgt.f+' g F / '+tgt.kh+' g KH</div>';
+
+  html += '<div class="timeline">';
+  const sum = {kcal:0,p:0,f:0,kh:0};
+  entries.forEach((e,i)=>{
+    const key = day+'-'+type+'-'+i;
+    const checked = !!state.done[key];
+    if (e.type==='meal'){ sum.kcal+=e.kcal||0; sum.p+=e.p||0; sum.f+=e.f||0; sum.kh+=e.kh||0; }
+    html += '<div class="entry '+(checked?'done':'')+'" onclick="toggleDone(\''+key+'\')">';
+    html += '<div class="timeCol"><div class="timeText">'+e.time+'</div>';
+    html += '<div class="node '+(e.type==='ritual'?'ritual':'')+'"></div>';
+    if (i<entries.length-1) html += '<div class="lineDown"></div>';
+    html += '</div>';
+    html += '<div class="entryBody"><div class="entryHead"><span class="entryTitle">'+e.title+'</span>';
+    if (e.kcal>0) html += '<span class="kcalTag">'+e.kcal+' kcal</span>';
+    html += '</div><p class="entryDesc">'+e.desc+'</p>';
+    if (e.p!=null){
+      html += '<div class="macroRow">'
+        + '<span class="macro" style="color:#3D5A3C;background:#3D5A3C18">P '+e.p+' g</span>'
+        + '<span class="macro" style="color:#8A6D3B;background:#8A6D3B18">F '+e.f+' g</span>'
+        + '<span class="macro" style="color:#1F3A4D;background:#1F3A4D18">KH '+e.kh+' g</span>'
+        + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="check '+(checked?'on':'')+'">'+(checked?'✓':'')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  const total = (sum.p+sum.f+sum.kh) || 1;
+  html += '<div class="summary"><div><span class="sumKcalNum">'+sum.kcal+'</span><span class="sumKcalLbl"> kcal gesamt</span></div>';
+  html += '<div class="macroBarOuter">'
+    + '<div style="width:'+(sum.p/total*100)+'%;background:#3D5A3C"></div>'
+    + '<div style="width:'+(sum.f/total*100)+'%;background:#8A6D3B"></div>'
+    + '<div style="width:'+(sum.kh/total*100)+'%;background:#1F3A4D"></div>'
+    + '</div>';
+  html += '<div class="macroLegend">'
+    + '<span><b style="color:#3D5A3C">■</b> Protein '+sum.p+' g</span>'
+    + '<span><b style="color:#8A6D3B">■</b> Fett '+sum.f+' g</span>'
+    + '<span><b style="color:#1F3A4D">■</b> KH '+sum.kh+' g</span>'
+    + '</div>';
+  if (type!=='fasting'){
+    html += '<p class="sumHint">Protein &amp; Fett bleiben jeden Esstag konstant (140 g / 63 g) — nur die Kohlenhydrate wandern zwischen Training (220 g) und Ruhetag (110 g).</p>';
+  }
+  html += '</div>';
+
+  document.getElementById('planView').innerHTML = html;
+}
+
+// ---------- Rendering: Einkaufsliste (dynamisch) ----------
+function renderShop(){
+  let trainCount = 0, restCount = 0;
+  for (let i=0;i<7;i++){
+    const t = dayType(i);
+    if (t==='training') trainCount++;
+    else if (t==='rest') restCount++;
+  }
+
+  function scaleQty(qtyStr, factor){
+    const m = qtyStr.match(/^([\d.,]+)\s*(.*)$/);
+    if (!m) return qtyStr+' × '+factor;
+    const num = parseFloat(m[1].replace(',','.'));
+    const unit = m[2];
+    const total = Math.round(num*factor*10)/10;
+    return total+' '+unit;
+  }
+
+  function groupHtml(title, sub, ingredients, factor){
+    let count = 0, bought = 0;
+    let rows = '';
+    ingredients.forEach(([name, qty])=>{
+      const key = title+'-'+name;
+      const on = !!state.bought[key];
+      count++; if (on) bought++;
+      const displayQty = factor===1 ? qty : scaleQty(qty, factor);
+      rows += '<div class="shopItem '+(on?'on':'')+'" onclick="toggleBought(\''+key.replace(/'/g,"\\'")+'\')">'
+        + '<div class="box '+(on?'on':'')+'">'+(on?'✓':'')+'</div><span>'+name+' — '+displayQty+'</span></div>';
+    });
+    return '<div class="shopGroup"><div class="shopHead"><span>'+title+'</span><span class="shopCount">'+bought+'/'+count+'</span></div>'
+      + '<div class="shopSub">'+sub+'</div>' + rows + '</div>';
+  }
+
+  let html = '';
+  if (trainCount>0) html += groupHtml('Trainingstage-Zutaten', trainCount+' Trainingstag(e) diese Woche', TRAINING_INGREDIENTS, trainCount);
+  if (restCount>0) html += groupHtml('Ruhetage-Zutaten', restCount+' Ruhetag(e) diese Woche', REST_INGREDIENTS, restCount);
+  html += groupHtml('Fastenbrechen', 'einmalig pro Woche', FAST_INGREDIENTS, 1);
+
+  const key = 'Grundvorrat';
+  let count = 0, bought = 0, rows='';
+  GRUNDVORRAT.forEach(name=>{
+    const k = key+'-'+name;
+    const on = !!state.bought[k];
+    count++; if (on) bought++;
+    rows += '<div class="shopItem '+(on?'on':'')+'" onclick="toggleBought(\''+k.replace(/'/g,"\\'")+'\')">'
+      + '<div class="box '+(on?'on':'')+'">'+(on?'✓':'')+'</div><span>'+name+'</span></div>';
+  });
+  html += '<div class="shopGroup"><div class="shopHead"><span>Grundvorrat prüfen</span><span class="shopCount">'+bought+'/'+count+'</span></div>' + rows + '</div>';
+
+  html += '<button class="resetBtn" onclick="resetWeek()">Neue Woche starten — alle Häkchen zurücksetzen</button>';
+  html += '<p class="shopNote">Mengen skalieren automatisch mit der Anzahl deiner aktuell gewählten Trainings- bzw. Ruhetage. Passe die Trainingstage oben an, die Liste rechnet sofort neu.</p>';
+
+  document.getElementById('shopView').innerHTML = html;
+}
+
+function renderAll(){
+  renderSettings();
+  if (tab==='plan') renderPlan(); else renderShop();
+}
+
+renderAll();
+setInterval(()=>{ if (tab==='plan') renderStatus(); }, 30000);
+</script>
+</body>
+</html>
