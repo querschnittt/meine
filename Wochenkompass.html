@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Wochenkompass">
+<title>Wochenkompass</title>
+<style>
+  :root{
+    --bg:#F2F1EA; --card:#FDFCF7; --border:#DEDCCB; --border2:#D8D6C8;
+    --ink:#22271E; --ink-soft:#4A4F43; --muted:#6B6F60;
+    --green:#5B6B3C; --green-dark:#3D5A3C; --tan:#8A6D3B; --blue:#1F3A4D;
+    --warn-bg:#F7E4DF; --warn-border:#E4C4BC; --warn-ink:#8A3B2E;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;}
+  body{padding-bottom:env(safe-area-inset-bottom);}
+  .app{max-width:480px; margin:0 auto; padding:20px 16px 40px;}
+  .eyebrow{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--green); font-weight:700;}
+  h1{font-family:Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size:34px; font-weight:600; margin:2px 0 10px; letter-spacing:-0.01em;}
+  .statusPill{display:inline-flex; align-items:center; gap:8px; color:#F2F1EA; font-size:12.5px;
+    font-weight:600; padding:7px 14px; border-radius:999px;}
+  .statusDot{width:8px; height:8px; border-radius:50%;}
+  .saveWarn{margin-top:8px; font-size:11.5px; color:var(--warn-ink); background:var(--warn-bg);
+    border:1px solid var(--warn-border); border-radius:8px; padding:7px 12px; line-height:1.4; display:none;}
+
+  .tabs{display:flex; gap:8px; margin:16px 0 14px;}
+  .tabBtn{flex:1; padding:9px 0; border-radius:8px; border:1px solid var(--border2);
+    background:var(--card); font-weight:700; font-size:13px; color:var(--muted);
+    cursor:pointer; transition:all .15s;}
+  .tabBtn.active{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+
+  .dayRow{display:flex; gap:6px; margin-bottom:12px;}
+  .dayBtn{flex:1; position:relative; padding:10px 0; border-radius:8px; border:1px solid var(--border2);
+    background:var(--card); font-weight:700; font-size:13px; color:var(--ink-soft); cursor:pointer;}
+  .dayBtn.sel{background:var(--green); color:var(--bg); border-color:var(--green);}
+  .dayBtn.fast{border-style:dashed;}
+  .dayBtn.fast.sel{background:var(--blue); border-color:var(--blue); border-style:solid;}
+  .todayMark{position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+    width:4px; height:4px; border-radius:50%; background:currentColor; opacity:.8;}
+
+  .dayLabel{display:flex; align-items:baseline; gap:10px; margin-bottom:12px;
+    font-family:Charter, "Iowan Old Style", Georgia, serif; font-size:20px;}
+  .setLabel{font-size:12px; font-family:-apple-system,sans-serif; color:var(--green); font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;}
+
+  .timeline{margin-bottom:18px;}
+  .entry{display:flex; gap:4px; cursor:pointer; border-radius:10px; padding:8px 8px 0 0; align-items:flex-start;}
+  .entry:active{background:rgba(91,107,60,0.08);}
+  .entry.done .entryTitle, .entry.done .entryDesc, .entry.done .kcalTag{opacity:.5;}
+  .timeCol{display:flex; flex-direction:column; align-items:center; width:62px; flex-shrink:0;}
+  .timeText{font-size:11.5px; font-weight:700; color:var(--green); margin-bottom:4px;
+    font-variant-numeric:tabular-nums;}
+  .node{width:12px; height:12px; border-radius:50%; border:2.5px solid var(--green); background:var(--bg);}
+  .node.ritual{border-color:var(--blue); border-style:dotted;}
+  .lineDown{width:2px; flex-grow:1; background:var(--border2); margin-top:4px; min-height:16px;}
+  .entryBody{flex-grow:1; padding-bottom:18px;}
+  .entryHead{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .entryTitle{font-weight:700; font-size:15px;}
+  .kcalTag{font-size:11.5px; font-weight:700; color:var(--tan); white-space:nowrap;}
+  .entryDesc{font-size:13px; line-height:1.5; margin:4px 0 6px; color:var(--ink-soft);}
+  .macroRow{display:flex; gap:6px; flex-wrap:wrap;}
+  .macro{font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; letter-spacing:.02em;}
+  .check{width:24px; height:24px; border-radius:7px; border:1.5px solid #C9C7B8; display:flex;
+    align-items:center; justify-content:center; font-size:14px; color:var(--bg); flex-shrink:0;
+    margin-top:2px; background:var(--card);}
+  .check.on{background:var(--green); border-color:var(--green);}
+
+  .summary{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 16px;
+    box-shadow:0 1px 3px rgba(34,39,30,0.06);}
+  .sumKcalNum{font-size:26px; font-weight:700;}
+  .sumKcalLbl{font-size:12px; opacity:.7;}
+  .macroBarOuter{display:flex; height:10px; border-radius:5px; overflow:hidden; margin:10px 0 6px;}
+  .macroLegend{display:flex; gap:14px; font-size:11px; opacity:.85; flex-wrap:wrap;}
+  .sumHint{font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.5;}
+
+  .shopGroup{background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px; margin-bottom:12px;}
+  .shopHead{display:flex; justify-content:space-between; font-weight:700; font-size:13.5px;
+    margin-bottom:8px; color:#3B402F; letter-spacing:.02em;}
+  .shopCount{color:var(--green); font-variant-numeric:tabular-nums;}
+  .shopItem{display:flex; align-items:center; gap:10px; padding:7px 4px; font-size:13.5px;
+    cursor:pointer; border-radius:6px;}
+  .shopItem:active{background:rgba(91,107,60,0.08);}
+  .shopItem.on span{opacity:.5; text-decoration:line-through;}
+  .box{width:20px; height:20px; border-radius:6px; border:1.5px solid #C9C7B8; display:flex;
+    align-items:center; justify-content:center; font-size:12px; color:var(--bg); flex-shrink:0;
+    background:var(--card);}
+  .box.on{background:var(--green); border-color:var(--green);}
+  .shopNote{font-size:11.5px; color:var(--muted); line-height:1.55; padding:0 4px;}
+
+  .resetBtn{width:100%; padding:11px 0; margin-bottom:12px; border-radius:10px;
+    border:1.5px dashed #B0AE9E; background:transparent; font-weight:700; font-size:12.5px;
+    color:var(--muted); cursor:pointer;}
+  .resetBtn:active{border-color:var(--green); color:var(--green); background:rgba(91,107,60,0.06);}
+
+  .offlineNote{font-size:10.5px; color:var(--muted); text-align:center; margin-top:24px; opacity:.7;}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="eyebrow">8 : 16 · vegetarisch · low carb</div>
+  <h1>Wochenkompass</h1>
+  <div id="statusPill" class="statusPill" style="display:none;">
+    <span class="statusDot" id="statusDot"></span>
+    <span id="statusMsg"></span>
+  </div>
+  <div class="saveWarn" id="saveWarn">Speichern nicht möglich — bitte prüfe, ob dein Browser lokalen Speicher erlaubt.</div>
+
+  <div class="tabs">
+    <button class="tabBtn active" id="tabPlanBtn" onclick="setTab('plan')">Tagesplan</button>
+    <button class="tabBtn" id="tabShopBtn" onclick="setTab('shop')">Einkaufsliste</button>
+  </div>
+
+  <div id="planView"></div>
+  <div id="shopView" style="display:none;"></div>
+
+  <div class="offlineNote">Läuft vollständig offline · Daten bleiben lokal auf diesem Gerät gespeichert</div>
+</div>
+
+<script>
+// ---------- Daten ----------
+const DAYS = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+
+const buero = [
+  {time:"11:45", title:"Flohsamenschalen", desc:"1 EL mit 350–400 ml Wasser", kcal:0, type:"ritual"},
+  {time:"12:00", title:"Eiweißdrink + Salatbar", desc:"500 ml Drink (40 g Protein) zu Beginn. Danach: Blattsalat, 150 g Hirtenkäse, 20 g Sonnenblumenkerne, 1 EL Olivenöl, 200 g griech. Joghurt 10 %", kcal:1150, p:87, f:95, kh:25, type:"meal"},
+  {time:"16:00", title:"Apfelessig + Snack", desc:"1–2 EL Apfelessig in 400 ml Wasser. Dazu 1 Apfel + 30 g Mandeln", kcal:260, p:6, f:16, kh:23, type:"meal"},
+  {time:"20:00", title:"Magerquark-Abend", desc:"500 g Magerquark mit Beeren + 20 g Walnüssen — kein Kochen nötig, ideal nach dem Training", kcal:590, p:93, f:18, kh:38, type:"meal"},
+];
+
+const PLAN = {
+  Montag: {label:"Fastentag · 24 h", fasting:true, entries:[
+    {time:"ganztägig", title:"Nur Wasser & Tee", desc:"Wasser, ungesüßter Tee, ggf. Elektrolyte", kcal:0, type:"ritual"},
+    {time:"19:45", title:"Flohsamenschalen", desc:"1 EL mit 350–400 ml Wasser", kcal:0, type:"ritual"},
+    {time:"20:00", title:"Fastenbrechen: Gemüsesuppe", desc:"Karotte, Zucchini, Sellerie mit Ei-Einlauf, 1 Scheibe Vollkornbrot — bewusst leicht nach 24 h", kcal:500, p:20, f:18, kh:55, type:"meal"},
+  ]},
+  Dienstag: {label:"Büro · No-Cook", entries:buero},
+  Mittwoch: {label:"Büro · No-Cook", entries:buero},
+  Donnerstag: {label:"Büro · No-Cook", entries:buero},
+  Freitag: {label:"Büro · No-Cook", entries:buero},
+  Samstag: {label:"Set A · Kochen", entries:[
+    {time:"11:45", title:"Flohsamenschalen", desc:"1 EL mit 350–400 ml Wasser", kcal:0, type:"ritual"},
+    {time:"12:00", title:"Griechischer Bauernsalat", desc:"Feta, 2 hartgekochte Eier, Gurke, Tomate, rote Zwiebel, Oliven, Olivenöl, Oregano", kcal:650, p:30, f:48, kh:18, type:"meal"},
+    {time:"16:00", title:"Apfelessig + Skyr-Bowl", desc:"1–2 EL Apfelessig in 400 ml Wasser. Skyr mit Beeren, Walnüssen, Chiasamen", kcal:450, p:30, f:22, kh:28, type:"meal"},
+    {time:"20:00", title:"Ofengemüse mit Halloumi", desc:"Paprika, Zucchini, Brokkoli aus dem Ofen, gebratener Halloumi, Kräuterquark", kcal:950, p:55, f:62, kh:30, type:"meal"},
+  ]},
+  Sonntag: {label:"Set B · Kochen", entries:[
+    {time:"11:45", title:"Flohsamenschalen", desc:"1 EL mit 350–400 ml Wasser", kcal:0, type:"ritual"},
+    {time:"12:00", title:"Zucchini-Frittata", desc:"3 Eier, Parmesan & frische Kräuter", kcal:600, p:34, f:44, kh:8, type:"meal"},
+    {time:"16:00", title:"Apfelessig + Hüttenkäse-Teller", desc:"1–2 EL Apfelessig in 400 ml Wasser. Hüttenkäse mit Gurke, Radieschen, Leinöl, 1 Knäckebrot", kcal:400, p:30, f:22, kh:22, type:"meal"},
+    {time:"20:00", title:"Auberginen-Parmigiana", desc:"Leichte Version mit Mozzarella, Tomatensugo & Blattsalat. Letzte Mahlzeit vor dem Fastentag!", kcal:1050, p:50, f:68, kh:40, type:"meal"},
+  ]},
+};
+
+const SHOPPING = [
+  {group:"Büro Di–Fr (No-Cook)", items:["Eiweißdrink / Pulver (4× 500 ml)","Hirtenkäse (600 g)","Sonnenblumenkerne","Griech. Joghurt 10 % (4× 200 g)","Äpfel (4)","Mandeln (1 Pkg.)","Magerquark (4× 500 g)","Beeren (TK, 1 große Tüte)","Walnüsse (1 Pkg.)"]},
+  {group:"Wochenende Sa/So (Sets A & B)", items:["Gurken (2)","Tomaten (4)","Rote Zwiebel (1)","Zucchini (2)","Brokkoli (1 Kopf)","Aubergine (1)","Radieschen (1 Bund)","Blattsalat (1 Beutel)","Oliven (1 Glas)","Eier (5)","Feta (1 Pkg.)","Mozzarella (2 Kugeln)","Halloumi (1 Pkg.)","Parmesan (100 g)","Hüttenkäse (1 Becher)","Quark + Kräuter (250 g)","Chiasamen","Leinöl (klein)","Knäckebrot","Tomatensugo (1 Dose)"]},
+  {group:"Montag (Fastenbrechen)", items:["Karotte","Zucchini (klein)","Sellerie","1 Ei","1 Scheibe Vollkornbrot"]},
+  {group:"Grundvorrat prüfen", items:["Flohsamenschalen","Apfelessig","Olivenöl","Whey-/Eiweißpulver","Oregano, Salz, Pfeffer","Elektrolyte (optional)"]},
+];
+
+// ---------- Zustand (lokal, offline) ----------
+const STORAGE_KEY = "wochenkompass-state-v1";
+let state = { done:{}, bought:{} };
+let saveOk = true;
+try {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) state = JSON.parse(raw);
+} catch(e) { saveOk = false; }
+
+function persist(){
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    document.getElementById('saveWarn').style.display = 'none';
+  } catch(e) {
+    document.getElementById('saveWarn').style.display = 'block';
+  }
+}
+
+let tab = "plan";
+const todayIdx = (new Date().getDay() + 6) % 7; // Mo = 0
+let dayIdx = todayIdx;
+
+// ---------- Fastenfenster-Status ----------
+function fmtDur(m){ return m>=60 ? Math.floor(m/60)+" h "+(m%60)+" min" : m+" min"; }
+function eatingWindowStatus(idx){
+  const now = new Date();
+  const mins = now.getHours()*60 + now.getMinutes();
+  const isFastday = idx===0;
+  const start = isFastday ? 20*60 : 12*60;
+  const end = 20*60;
+  if (isFastday){
+    if (mins<start) return {inWindow:false, msg:"Fastentag — Fastenbrechen um 20:00 (noch "+fmtDur(start-mins)+")"};
+    return {inWindow:true, msg:"Fastenbrechen-Fenster geöffnet"};
+  }
+  if (mins<start) return {inWindow:false, msg:"Fastenfenster — Essensfenster öffnet in "+fmtDur(start-mins)};
+  if (mins<=end) return {inWindow:true, msg:"Essensfenster — schließt in "+fmtDur(end-mins)};
+  return {inWindow:false, msg:"Fastenfenster — bis morgen 12:00"};
+}
+
+// ---------- Rendering ----------
+function setTab(t){
+  tab = t;
+  document.getElementById('tabPlanBtn').classList.toggle('active', t==='plan');
+  document.getElementById('tabShopBtn').classList.toggle('active', t==='shop');
+  document.getElementById('planView').style.display = t==='plan' ? '' : 'none';
+  document.getElementById('shopView').style.display = t==='shop' ? '' : 'none';
+  if (t==='plan') renderPlan(); else renderShop();
+}
+
+function selectDay(i){ dayIdx = i; renderPlan(); }
+
+function toggleDone(key){
+  state.done[key] = !state.done[key];
+  persist();
+  renderPlan();
+}
+function toggleBought(key){
+  state.bought[key] = !state.bought[key];
+  persist();
+  renderShop();
+}
+function resetWeek(){
+  state = {done:{}, bought:{}};
+  persist();
+  renderPlan(); renderShop();
+}
+
+function renderStatus(){
+  const pill = document.getElementById('statusPill');
+  if (dayIdx !== todayIdx){ pill.style.display='none'; return; }
+  const s = eatingWindowStatus(dayIdx);
+  pill.style.display = 'inline-flex';
+  pill.style.background = s.inWindow ? 'var(--green-dark)' : 'var(--blue)';
+  document.getElementById('statusDot').style.background = s.inWindow ? '#B7E4A8' : '#9FC4DE';
+  document.getElementById('statusDot').style.boxShadow = s.inWindow
+    ? '0 0 0 3px rgba(183,228,168,0.3)' : '0 0 0 3px rgba(159,196,222,0.25)';
+  document.getElementById('statusMsg').textContent = s.msg;
+}
+
+function renderPlan(){
+  renderStatus();
+  const day = DAYS[dayIdx];
+  const plan = PLAN[day];
+  let html = '<div class="dayRow">';
+  DAYS.forEach((d,i)=>{
+    const sel = i===dayIdx ? 'sel' : '';
+    const fast = i===0 ? 'fast' : '';
+    html += '<button class="dayBtn '+sel+' '+fast+'" onclick="selectDay('+i+')">'+d.slice(0,2)
+      + (i===todayIdx ? '<span class="todayMark"></span>' : '') + '</button>';
+  });
+  html += '</div>';
+  html += '<div class="dayLabel"><strong>'+day+'</strong><span class="setLabel">'+plan.label+'</span></div>';
+  html += '<div class="timeline">';
+  const sum = {kcal:0,p:0,f:0,kh:0};
+  plan.entries.forEach((e,i)=>{
+    const key = day+'-'+i;
+    const checked = !!state.done[key];
+    if (e.type==='meal'){ sum.kcal+=e.kcal||0; sum.p+=e.p||0; sum.f+=e.f||0; sum.kh+=e.kh||0; }
+    html += '<div class="entry '+(checked?'done':'')+'" onclick="toggleDone(\''+key+'\')">';
+    html += '<div class="timeCol"><div class="timeText">'+e.time+'</div>';
+    html += '<div class="node '+(e.type==='ritual'?'ritual':'')+'"></div>';
+    if (i<plan.entries.length-1) html += '<div class="lineDown"></div>';
+    html += '</div>';
+    html += '<div class="entryBody"><div class="entryHead"><span class="entryTitle">'+e.title+'</span>';
+    if (e.kcal>0) html += '<span class="kcalTag">'+e.kcal+' kcal</span>';
+    html += '</div><p class="entryDesc">'+e.desc+'</p>';
+    if (e.p!=null){
+      html += '<div class="macroRow">'
+        + '<span class="macro" style="color:#3D5A3C;background:#3D5A3C18">P '+e.p+' g</span>'
+        + '<span class="macro" style="color:#8A6D3B;background:#8A6D3B18">F '+e.f+' g</span>'
+        + '<span class="macro" style="color:#1F3A4D;background:#1F3A4D18">KH '+e.kh+' g</span>'
+        + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="check '+(checked?'on':'')+'">'+(checked?'✓':'')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  const total = (sum.p+sum.f+sum.kh) || 1;
+  html += '<div class="summary"><div><span class="sumKcalNum">'+sum.kcal+'</span><span class="sumKcalLbl"> kcal gesamt</span></div>';
+  html += '<div class="macroBarOuter">'
+    + '<div style="width:'+(sum.p/total*100)+'%;background:#3D5A3C"></div>'
+    + '<div style="width:'+(sum.f/total*100)+'%;background:#8A6D3B"></div>'
+    + '<div style="width:'+(sum.kh/total*100)+'%;background:#1F3A4D"></div>'
+    + '</div>';
+  html += '<div class="macroLegend">'
+    + '<span><b style="color:#3D5A3C">■</b> Protein '+sum.p+' g</span>'
+    + '<span><b style="color:#8A6D3B">■</b> Fett '+sum.f+' g</span>'
+    + '<span><b style="color:#1F3A4D">■</b> KH '+sum.kh+' g</span>'
+    + '</div>';
+  if (!plan.fasting){
+    html += '<p class="sumHint">Zielbereich 2000–2400 kcal · an harten Trainingstagen: Snack um 16:00 aufstocken (z. B. +1 EL Erdnussmus)</p>';
+  }
+  html += '</div>';
+
+  document.getElementById('planView').innerHTML = html;
+}
+
+function renderShop(){
+  let html = '';
+  SHOPPING.forEach(g=>{
+    const doneCount = g.items.filter(it=>state.bought[g.group+'-'+it]).length;
+    html += '<div class="shopGroup"><div class="shopHead"><span>'+g.group+'</span>'
+      + '<span class="shopCount">'+doneCount+'/'+g.items.length+'</span></div>';
+    g.items.forEach(it=>{
+      const key = g.group+'-'+it;
+      const on = !!state.bought[key];
+      html += '<div class="shopItem '+(on?'on':'')+'" onclick="toggleBought(\''+key.replace(/'/g,"\\'")+'\')">'
+        + '<div class="box '+(on?'on':'')+'">'+(on?'✓':'')+'</div><span>'+it+'</span></div>';
+    });
+    html += '</div>';
+  });
+  html += '<button class="resetBtn" onclick="resetWeek()">Neue Woche starten — alle Häkchen zurücksetzen</button>';
+  html += '<p class="shopNote">Salatbar-Zutaten kaufst du täglich frisch — sie stehen bewusst nicht auf der Liste. '
+    + 'Deine Häkchen werden lokal auf diesem Gerät gespeichert und bleiben offline erhalten.</p>';
+  document.getElementById('shopView').innerHTML = html;
+}
+
+if (!saveOk) document.getElementById('saveWarn').style.display = 'block';
+
+renderPlan();
+renderShop();
+setInterval(()=>{ if (tab==='plan') renderStatus(); }, 30000);
+</script>
+</body>
+</html>
