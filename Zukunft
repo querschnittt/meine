@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investitionsanalyse - Eckbusch 7</title>
+  
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Compiler für JSX im Browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Prop-Types -->
+  <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  
+  <!-- Recharts Library -->
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+</head>
+<body style="margin: 0; background-color: #FAF9F5;">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+    const { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } = Recharts;
+
+    const fmt = (n) =>
+      Math.round(n).toLocaleString("de-DE", { maximumFractionDigits: 0 });
+    const fmtSigned = (n) => (n >= 0 ? "+" : "") + fmt(n);
+
+    const BASE_SCENARIOS = [
+      { id: "A1", model: "Modell A", homeUnit: "WE1 187,84 m²", rentedUnit: "WE2 82,08 m²", type: "Dauervermietung", grossRent: 944, netIncome: 895, deductPct: 30.4, color: "#4A7C59" },
+      { id: "A2", model: "Modell A", homeUnit: "WE1 187,84 m²", rentedUnit: "WE2 82,08 m²", type: "Ferienwohnung", grossRent: 2100, netIncome: 1450, deductPct: 30.4, color: "#4A7C59" },
+      { id: "A3", model: "Modell A", homeUnit: "WE1 187,84 m²", rentedUnit: "WE2 82,08 m²", type: "Elternwohnen", grossRent: 450, netIncome: 450, deductPct: 30.4, color: "#4A7C59" },
+      { id: "B1", model: "Modell B", homeUnit: "WE2 82,08 m²", rentedUnit: "WE1 187,84 m²", type: "Dauervermietung", grossRent: 2160, netIncome: 2050, deductPct: 69.6, color: "#3D6B8A" },
+      { id: "B2", model: "Modell B", homeUnit: "WE2 82,08 m²", rentedUnit: "WE1 187,84 m² (Ferienhaus)", type: "Ferienhaus", grossRent: 4200, netIncome: 2800, deductPct: 69.6, color: "#3D6B8A" },
+      { id: "B3", model: "Modell B", homeUnit: "WE2 82,08 m²", rentedUnit: "WE1 187,84 m²", type: "Elternwohnen", grossRent: 1100, netIncome: 1100, deductPct: 69.6, color: "#3D6B8A" },
+      { id: "C1", model: "Modell C", homeUnit: "Keine (Fremdbezug)", rentedUnit: "WE1 + WE2 (269,92 m²)", type: "Vollvermietung", grossRent: 3104, netIncome: 2945, deductPct: 100.0, color: "#D97706" },
+    ];
+
+    const DEFAULT_PARAMS = {
+      purchasePrice: 320000,
+      purchaseCostPct: 8.5,
+      renovation: 180000,
+      bufferPct: 10,
+      equityGift: 100000,
+      equityReserves: 0,
+      familyLoanPrincipal: 200000,
+      familyLoanRateMonthly: 950,
+      familyLoanInterestPct: 3.5, // Direkt angepasst auf 3,5%
+      bankKfwPrincipal: 191200,
+      bankKfwRateMonthly: 875,
+      bankKfwInterestPct: 3.5,
+      marginalTaxPct: 42,
+      afaPct: 2.0,
+      buildingSharePct: 70,
+      rentGrowthPct: 2.0,
+      projectionYears: 15,
+    };
+
+    function NumberField({ label, value, onChange, suffix, step = 1, min = 0 }) {
+      return (
+        <label className="field">
+          <span className="field-label">{label}</span>
+          <div className="field-input">
+            <input
+              type="number"
+              value={value}
+              step={step}
+              min={min}
+              onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+            />
+            {suffix && <span className="field-suffix">{suffix}</span>}
+          </div>
+        </label>
+      );
+    }
+
+    function Waterfall({ rows, total }) {
+      const max = Math.max(...rows.map((r) => r.value), 1);
+      return (
+        <div className="waterfall">
+          {rows.map((r) => (
+            <div className="wf-row" key={r.label}>
+              <span>{r.label}</span>
+              <div className="wf-bar-track">
+                <div className="wf-bar" style={{ width: `${(r.value / max) * 100}%`, background: r.color }} />
+              </div>
+              <span className="wf-val num">{fmt(r.value)} €</span>
+            </div>
+          ))}
+          <div className="wf-row" style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 6, marginTop: 2, fontWeight: 500 }}>
+            <span>Summe</span>
+            <div />
+            <span className="wf-val num">{fmt(total)} €</span>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [params, setParams] = useState(DEFAULT_PARAMS);
+      const [rentOverrides, setRentOverrides] = useState({});
+      const [selectedScenarios, setSelectedScenarios] = useState(["A2", "B1", "C1"]);
+      const [tab, setTab] = useState("uebersicht");
+
+      const setP = (key) => (val) => setParams((p) => ({ ...p, [key]: val }));
+
+      const derived = useMemo(() => {
+        const purchaseCosts = params.purchasePrice * (params.purchaseCostPct / 100);
+        const bufferEur = params.renovation * (params.bufferPct / 100);
+        const totalInvestment = params.purchasePrice + purchaseCosts + params.renovation + bufferEur;
+        const totalDebtServiceMonthly = params.familyLoanRateMonthly + params.bankKfwRateMonthly;
+        const totalSources =
+          params.equityGift + params.equityReserves + params.familyLoanPrincipal + params.bankKfwPrincipal;
+        const financingGap = totalInvestment - totalSources;
+        const afaBasis =
+          (params.buildingSharePct / 100) * (params.purchasePrice + purchaseCosts) + params.renovation;
+        const afaAnnual = afaBasis * (params.afaPct / 100);
+        const zinsenAnnual =
+          params.familyLoanPrincipal * (params.familyLoanInterestPct / 100) +
+          params.bankKfwPrincipal * (params.bankKfwInterestPct / 100);
+        return {
+          purchaseCosts, bufferEur, totalInvestment,
+          totalDebtServiceMonthly, totalSources, financingGap, afaBasis, afaAnnual, zinsenAnnual,
+        };
+      }, [params]);
+
+      const scenarios = useMemo(() => {
+        return BASE_SCENARIOS.map((s) => {
+          const grossRent = rentOverrides[s.id] ?? s.grossRent;
+          const ratio = s.netIncome / s.grossRent;
+          const netIncome = grossRent * ratio;
+          const outOfPocket = netIncome - derived.totalDebtServiceMonthly;
+
+          const werbungskosten = derived.afaAnnual + derived.zinsenAnnual;
+          const anteiligVermietet = werbungskosten * (s.deductPct / 100);
+          const kaltmieteJahr = grossRent * 12;
+          const steuerErgebnis = kaltmieteJahr - anteiligVermietet;
+          const steuerEffektJahr = -steuerErgebnis * (params.marginalTaxPct / 100);
+          const steuerEffektMonat = steuerEffektJahr / 12;
+          const outOfPocketAfterTax = outOfPocket + steuerEffektMonat;
+
+          return {
+            ...s, grossRent, netIncome, outOfPocket,
+            anteiligVermietet, steuerErgebnis, steuerEffektJahr, steuerEffektMonat,
+            outOfPocketAfterTax,
+          };
+        });
+      }, [rentOverrides, derived, params.marginalTaxPct]);
+
+      const projection = useMemo(() => {
+        const years = Math.max(1, Math.round(params.projectionYears));
+        const byScenario = {};
+        scenarios.forEach((s) => {
+          let cumulative = 0;
+          const rows = [];
+          for (let y = 1; y <= years; y++) {
+            const factor = Math.pow(1 + params.rentGrowthPct / 100, y - 1);
+            const grossRent_y = s.grossRent * factor;
+            const netIncome_y = s.netIncome * factor;
+            const outOfPocket_y = netIncome_y - derived.totalDebtServiceMonthly;
+            const werbungskosten = derived.afaAnnual + derived.zinsenAnnual;
+            const anteiligVermietet = werbungskosten * (s.deductPct / 100);
+            const kaltmieteJahr = grossRent_y * 12;
+            const steuerErgebnis = kaltmieteJahr - anteiligVermietet;
+            const steuerEffektJahr = -steuerErgebnis * (params.marginalTaxPct / 100);
+            const monthlyCashflow = outOfPocket_y + steuerEffektJahr / 12;
+            const annualCashflow = monthlyCashflow * 12;
+            cumulative += annualCashflow;
+            rows.push({ year: y, annualCashflow, cumulative });
+          }
+          byScenario[s.id] = rows;
+        });
+
+        const chartData = [];
+        for (let y = 1; y <= years; y++) {
+          const row = { year: `Jahr ${y}` };
+          selectedScenarios.forEach((id) => {
+            const r = byScenario[id]?.find((x) => x.year === y);
+            if (r) row[id] = Math.round(r.cumulative);
+          });
+          chartData.push(row);
+        }
+
+        const breakeven = {};
+        selectedScenarios.forEach((id) => {
+          const rows = byScenario[id] || [];
+          const found = rows.find((r) => r.cumulative >= 0);
+          breakeven[id] = found ? found.year : null;
+        });
+
+        return { chartData, breakeven, years };
+      }, [scenarios, params.rentGrowthPct, params.projectionYears, derived, selectedScenarios]);
+
+      const barData = scenarios.map((s) => ({
+        id: s.id,
+        label: `${s.id}`,
+        vorSteuer: Math.round(s.outOfPocket),
+        nachSteuer: Math.round(s.outOfPocketAfterTax),
+      }));
+
+      const toggleScenario = (id) => {
+        setSelectedScenarios((cur) =>
+          cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
+        );
+      };
+
+      const getModelClass = (model) => {
+        if (model === "Modell A") return "modelA";
+        if (model === "Modell B") return "modelB";
+        return "modelC";
+      };
+
+      return (
+        <div className="app">
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+            .app { --ink:#1B2838; --paper:#FAF9F5; --line:#C7CFD6; --line-soft:#E4E8EC;
+              --blue:#3D6B8A; --blue-dark:#1B2838; --green:#4A7C59; --green-bg:#EAF1EA;
+              --amber:#D97706; --red:#A34A3E; --red-bg:#F7EBE9; --muted:#6B7480; --card:#FFFFFF;
+              font-family:'IBM Plex Sans', sans-serif; color:var(--ink); background:var(--paper);
+              max-width:960px; margin:0 auto; padding:1.5rem 1rem 3rem; }
+            .app * { box-sizing:border-box; }
+            .num { font-family:'IBM Plex Mono', monospace; }
+
+            .hero { background:var(--blue-dark); color:#EDF2F5; padding:2rem 1.75rem;
+              border-radius:4px; margin-bottom:1.5rem; position:relative; overflow:hidden;
+              background-image:
+                linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+              background-size:24px 24px; }
+            .hero-eyebrow { font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.08em;
+              color:#8FB3C9; text-transform:uppercase; margin:0 0 6px; }
+            .hero h1 { font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:26px;
+              margin:0 0 4px; }
+            .hero-sub { font-size:14px; color:#B9C8D1; margin:0 0 20px; }
+            .hero-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+              background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.15); border-radius:3px; overflow:hidden; }
+            .hero-stat { background:var(--blue-dark); padding:12px 14px; }
+            .hero-stat .l { font-size:11px; color:#8FB3C9; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+            .hero-stat .v { font-family:'IBM Plex Mono', monospace; font-size:19px; font-weight:500; }
+
+            .tabs { display:flex; gap:0; border-bottom:1px solid var(--line); margin-bottom:1.5rem; }
+            .tab { font-family:'Space Grotesk', sans-serif; font-size:14px; font-weight:500; padding:10px 18px;
+              background:none; border:none; cursor:pointer; color:var(--muted); position:relative; }
+            .tab.active { color:var(--blue-dark); }
+            .tab.active::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--blue-dark); }
+
+            h2.section { font-family:'Space Grotesk', sans-serif; font-size:16px; font-weight:600;
+              margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+            .section-desc { font-size:13px; color:var(--muted); margin:0 0 16px; }
+
+            .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:2rem; align-items:start; }
+            .panel { background:var(--card); border:1px solid var(--line-soft); border-radius:6px; padding:1.25rem 1.5rem; margin-bottom:1.25rem; }
+
+            .field-group { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+            .field { display:flex; flex-direction:column; gap:4px; font-size:12px; }
+            .field-label { color:var(--muted); }
+            .field-input { display:flex; align-items:center; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:#fff; }
+            .field-input input { border:none; padding:7px 8px; width:100%; font-family:'IBM Plex Mono', monospace;
+              font-size:13px; color:var(--ink); background:transparent; outline:none; }
+            .field-input:focus-within { border-color:var(--blue); box-shadow:0 0 0 2px rgba(61,107,138,0.15); }
+            .field-suffix { padding:0 8px; color:var(--muted); font-size:12px; border-left:1px solid var(--line-soft); }
+
+            .scenario-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+            .scenario-card { border:1px solid var(--line-soft); border-radius:6px; padding:14px 16px; background:#fff; }
+            .scenario-card.modelA { border-top:3px solid var(--green); }
+            .scenario-card.modelB { border-top:3px solid var(--blue); }
+            .scenario-card.modelC { border-top:3px solid var(--amber); }
+            .sc-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px; }
+            .sc-tag { font-family:'IBM Plex Mono', monospace; font-size:11px; padding:2px 6px; border-radius:3px;
+              background:var(--line-soft); color:var(--ink); }
+            .sc-type { font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:14px; }
+            .sc-desc { font-size:12px; color:var(--muted); margin-bottom:10px; }
+            .sc-rent-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+            .sc-rent-row input { width:80px; font-family:'IBM Plex Mono', monospace; border:1px solid var(--line);
+              border-radius:4px; padding:5px 6px; font-size:12px; }
+            .sc-metrics { display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; margin-top:8px; }
+            .sc-metric .l { color:var(--muted); font-size:11px; }
+            .sc-metric .v { font-family:'IBM Plex Mono', monospace; font-size:14px; font-weight:500; }
+            .pos { color:var(--green); } .neg { color:var(--red); }
+            .oop-badge { margin-top:10px; padding:8px 10px; border-radius:4px; font-family:'IBM Plex Mono', monospace;
+              font-size:13px; font-weight:500; text-align:center; }
+            .oop-badge.pos { background:var(--green-bg); color:#2E5238; }
+            .oop-badge.neg { background:var(--red-bg); color:#7A362C; }
+
+            .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:1rem; }
+            .chip { font-family:'IBM Plex Mono', monospace; font-size:12px; padding:5px 10px; border-radius:20px;
+              border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--muted); }
+            .chip.on { background:var(--blue-dark); color:#fff; border-color:var(--blue-dark); }
+
+            .breakeven-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+            .be-chip { font-size:12px; border:1px solid var(--line-soft); border-radius:4px; padding:6px 10px; }
+            .be-chip b { font-family:'IBM Plex Mono', monospace; }
+
+            .note { font-size:12px; color:var(--muted); background:#F1EEE5; border-left:3px solid var(--line); padding:10px 12px; border-radius:0 4px 4px 0; margin-top:1rem; }
+
+            .waterfall { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+            .wf-row { display:grid; grid-template-columns:150px 1fr 90px; align-items:center; gap:10px; font-size:12px; }
+            .wf-bar-track { background:var(--line-soft); border-radius:3px; height:10px; overflow:hidden; }
+            .wf-bar { height:100%; }
+            .wf-val { text-align:right; font-family:'IBM Plex Mono', monospace; }
+
+            @media (max-width: 720px) {
+              .grid-2 { grid-template-columns:1fr; }
+              .field-group { grid-template-columns:1fr; }
+            }
+          `}</style>
+
+          <div className="hero">
+            <p className="hero-eyebrow">Investitionsanalyse — Bestandsobjekt</p>
+            <h1>Eckbusch 7, Lübeck-Oberbüssau</h1>
+            <p className="hero-sub">187,84 m² WE1 + 82,08 m² WE2 (269,92 m² Wohnfläche) + 93,58 m² nutzbares Kellergeschoss · Zwei-Einheiten-Konzept</p>
+            <div className="hero-stats">
+              <div className="hero-stat"><div className="l">Gesamtinvestition</div><div className="v">{fmt(derived.totalInvestment)} €</div></div>
+              <div className="hero-stat"><div className="l">Eigenkapital</div><div className="v">{fmt(params.equityGift + params.equityReserves)} €</div></div>
+              <div className="hero-stat"><div className="l">Fremdkapital (Zusagen)</div><div className="v">{fmt(params.familyLoanPrincipal + params.bankKfwPrincipal)} €</div></div>
+              <div className="hero-stat"><div className="l">Kapitaldienst / Monat</div><div className="v">{fmt(derived.totalDebtServiceMonthly)} €</div></div>
+            </div>
+          </div>
+
+          <div className="tabs">
+            <button className={`tab ${tab === "uebersicht" ? "active" : ""}`} onClick={() => setTab("uebersicht")}>Finanzierung</button>
+            <button className={`tab ${tab === "szenarien" ? "active" : ""}`} onClick={() => setTab("szenarien")}>Szenarien</button>
+            <button className={`tab ${tab === "prognose" ? "active" : ""}`} onClick={() => setTab("prognose")}>Langzeit-Prognose</button>
+            <button className={`tab ${tab === "parameter" ? "active" : ""}`} onClick={() => setTab("parameter")}>Parameter</button>
+          </div>
+
+          {tab === "uebersicht" && (
+            <div className="grid-2">
+              <div className="panel">
+                <h2 className="section">Mittelverwendung</h2>
+                <p className="section-desc">Kaufpreis, Nebenkosten, Sanierung und Puffer</p>
+                <Waterfall
+                  rows={[
+                    { label: "Kaufpreis", value: params.purchasePrice, color: "var(--blue)" },
+                    { label: `Kaufnebenkosten (${params.purchaseCostPct}%)`, value: derived.purchaseCosts, color: "var(--blue)" },
+                    { label: "Sanierung", value: params.renovation, color: "var(--green)" },
+                    { label: `Puffer (${params.bufferPct}%)`, value: derived.bufferEur, color: "var(--red)" },
+                  ]}
+                  total={derived.totalInvestment}
+                />
+              </div>
+              <div className="panel">
+                <h2 className="section">Mittelherkunft</h2>
+                <p className="section-desc">Eigenkapital, Familiendarlehen und Bankdarlehen (KfW-Förderung als Bestandteil des Bankdarlehens)</p>
+                <Waterfall
+                  rows={[
+                    { label: "Eigenkapital (Schenkung)", value: params.equityGift, color: "var(--green)" },
+                    { label: "Eigenkapital (Rücklage)", value: params.equityReserves, color: "var(--green)" },
+                    { label: "Familiendarlehen", value: params.familyLoanPrincipal, color: "var(--blue)" },
+                    { label: "Bank-/KfW-Darlehen", value: params.bankKfwPrincipal, color: "var(--blue)" },
+                  ]}
+                  total={derived.totalSources}
+                />
+                <div className="note">
+                  Familiendarlehen: {fmt(params.familyLoanPrincipal)} € zu {fmt(params.familyLoanRateMonthly)} €/Monat ({params.familyLoanInterestPct}% Zins).
+                  Bank-/KfW-Darlehen: {fmt(params.bankKfwPrincipal)} € zu {fmt(params.bankKfwRateMonthly)} €/Monat.
+                  Gesamter Kapitaldienst: <b className="num">{fmt(derived.totalDebtServiceMonthly)} € / Monat</b>.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "szenarien" && (
+            <div>
+              <div className="panel">
+                <h2 className="section">Vermietungsmodelle im Vergleich</h2>
+                <p className="section-desc">Kaltmiete editierbar — Modell C umfasst die Vollvermietung beider Einheiten (WE1 + WE2).</p>
+                <div className="scenario-grid">
+                  {scenarios.map((s) => (
+                    <div key={s.id} className={`scenario-card ${getModelClass(s.model)}`}>
+                      <div className="sc-head">
+                        <span className="sc-type">{s.type}</span>
+                        <span className="sc-tag">{s.id}</span>
+                      </div>
+                      <div className="sc-desc">{s.model} · Sie wohnen: {s.homeUnit} · vermietet: {s.rentedUnit}</div>
+                      <div className="sc-rent-row">
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>Kaltmiete/Monat</span>
+                        <input
+                          type="number" className="num" value={Math.round(s.grossRent)}
+                          onChange={(e) =>
+                            setRentOverrides((r) => ({ ...r, [s.id]: parseFloat(e.target.value) || 0 }))
+                          }
+                        />
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>€</span>
+                      </div>
+                      <div className="sc-metrics">
+                        <div className="sc-metric"><div className="l">Nettoeinnahme/Monat</div><div className="v">{fmt(s.netIncome)} €</div></div>
+                        <div className="sc-metric"><div className="l">Steuerlich absetzbar</div><div className="v">{s.deductPct}%</div></div>
+                        <div className="sc-metric"><div className="l">Steuereffekt/Monat</div><div className={`v ${s.steuerEffektMonat >= 0 ? "pos" : "neg"}`}>{fmtSigned(s.steuerEffektMonat)} €</div></div>
+                        <div className="sc-metric"><div className="l">vor Steuer/Monat</div><div className={`v ${s.outOfPocket >= 0 ? "pos" : "neg"}`}>{fmtSigned(s.outOfPocket)} €</div></div>
+                      </div>
+                      <div className={`oop-badge ${s.outOfPocketAfterTax >= 0 ? "pos" : "neg"}`}>
+                        Nach Steuer: {fmtSigned(s.outOfPocketAfterTax)} €/Monat
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel">
+                <h2 className="section">Monatliche Belastung — vor und nach Steuer</h2>
+                <p className="section-desc">Negative Werte = Zuzahlung, positive Werte = Überschuss</p>
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="2 4" stroke="#E4E8EC" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fontFamily: "IBM Plex Mono" }} />
+                      <YAxis tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
+                      <Tooltip formatter={(v) => `${fmt(v)} €`} contentStyle={{ fontFamily: "IBM Plex Mono", fontSize: 12 }} />
+                      <ReferenceLine y={0} stroke="#1B2838" />
+                      <Bar dataKey="vorSteuer" name="vor Steuer" fill="#B9C8D1" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="nachSteuer" name="nach Steuer" fill="#3D6B8A" radius={[3, 3, 0, 0]} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "prognose" && (
+            <div className="panel">
+              <h2 className="section">Kumulierte Liquidität über {projection.years} Jahre</h2>
+              <p className="section-desc">Mietsteigerung {params.rentGrowthPct}% p.a., Kapitaldienst konstant, Zinssätze aus Steuer-Annahmen. Szenarien zum Vergleich auswählen:</p>
+              <div className="chips">
+                {scenarios.map((s) => (
+                  <button key={s.id} className={`chip ${selectedScenarios.includes(s.id) ? "on" : ""}`} onClick={() => toggleScenario(s.id)}>
+                    {s.id} · {s.type}
+                  </button>
+                ))}
+              </div>
+              <div style={{ width: "100%", height: 340 }}>
+                <ResponsiveContainer>
+                  <LineChart data={projection.chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="2 4" stroke="#E4E8EC" vertical={false} />
+                    <XAxis dataKey="year" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} interval={Math.ceil(projection.years / 10) - 1} />
+                    <YAxis tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                    <Tooltip formatter={(v) => `${fmt(v)} €`} contentStyle={{ fontFamily: "IBM Plex Mono", fontSize: 12 }} />
+                    <ReferenceLine y={0} stroke="#1B2838" />
+                    {selectedScenarios.map((id) => {
+                      const s = scenarios.find((x) => x.id === id);
+                      return <Line key={id} type="monotone" dataKey={id} name={`${id} · ${s?.type}`} stroke={s?.color} strokeWidth={2} dot={false} />;
+                    })}
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="breakeven-row">
+                {selectedScenarios.map((id) => {
+                  const s = scenarios.find((x) => x.id === id);
+                  const be = projection.breakeven[id];
+                  return (
+                    <div key={id} className="be-chip">
+                      {id} · {s?.type}: {be ? <span>Break-even in Jahr <b>{be}</b></span> : <span>kein Break-even in {projection.years} Jahren</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {tab === "parameter" && (
+            <div className="grid-2">
+              <div className="panel">
+                <h2 className="section">Investition &amp; Finanzierung</h2>
+                <div className="field-group">
+                  <NumberField label="Kaufpreis" value={params.purchasePrice} onChange={setP("purchasePrice")} suffix="€" step={1000} />
+                  <NumberField label="Kaufnebenkosten" value={params.purchaseCostPct} onChange={setP("purchaseCostPct")} suffix="%" step={0.1} />
+                  <NumberField label="Sanierungskosten" value={params.renovation} onChange={setP("renovation")} suffix="€" step={1000} />
+                  <NumberField label="Puffer" value={params.bufferPct} onChange={setP("bufferPct")} suffix="%" step={1} />
+                  <NumberField label="Eigenkapital (Schenkung)" value={params.equityGift} onChange={setP("equityGift")} suffix="€" step={1000} />
+                  <NumberField label="Eigenkapital (Rücklage)" value={params.equityReserves} onChange={setP("equityReserves")} suffix="€" step={1000} />
+                  <NumberField label="Familiendarlehen" value={params.familyLoanPrincipal} onChange={setP("familyLoanPrincipal")} suffix="€" step={1000} />
+                  <NumberField label="Rate Familiendarlehen" value={params.familyLoanRateMonthly} onChange={setP("familyLoanRateMonthly")} suffix="€/Mon." step={10} />
+                  <NumberField label="Bank-/KfW-Darlehen" value={params.bankKfwPrincipal} onChange={setP("bankKfwPrincipal")} suffix="€" step={1000} />
+                  <NumberField label="Rate Bank-/KfW-Darlehen" value={params.bankKfwRateMonthly} onChange={setP("bankKfwRateMonthly")} suffix="€/Mon." step={10} />
+                </div>
+              </div>
+              <div className="panel">
+                <h2 className="section">Steuer &amp; Prognose-Annahmen</h2>
+                <div className="field-group">
+                  <NumberField label="Grenzsteuersatz" value={params.marginalTaxPct} onChange={setP("marginalTaxPct")} suffix="%" step={1} />
+                  <NumberField label="AfA-Satz Gebäude" value={params.afaPct} onChange={setP("afaPct")} suffix="%" step={0.1} />
+                  <NumberField label="Gebäudeanteil Kaufpreis" value={params.buildingSharePct} onChange={setP("buildingSharePct")} suffix="%" step={1} />
+                  <NumberField label="Zinssatz Familiendarlehen" value={params.familyLoanInterestPct} onChange={setP("familyLoanInterestPct")} suffix="%" step={0.1} />
+                  <NumberField label="Zinssatz Bank-/KfW-Darlehen" value={params.bankKfwInterestPct} onChange={setP("bankKfwInterestPct")} suffix="%" step={0.1} />
+                  <NumberField label="Mietsteigerung p.a." value={params.rentGrowthPct} onChange={setP("rentGrowthPct")} suffix="%" step={0.1} />
+                  <NumberField label="Prognosezeitraum" value={params.projectionYears} onChange={setP("projectionYears")} suffix="Jahre" step={1} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
